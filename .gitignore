@@ -21,7 +21,6 @@ qrc_*.cpp
 *.Release
 tmp
 debug
-release
 /qgroundcontrol
 qgroundcontrol.xcodeproj/**
 doc/html
