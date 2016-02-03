@@ -32,7 +32,7 @@ build_script:
 # build the symbol / PE store
   - '"C:\Program Files\Debugging Tools for Windows (x64)\symstore.exe" add /compress /s symbols /f %SHADOW_BUILD_DIR%\release\qgroundcontrol.pdb /t qgroundcontrol'
   - '"C:\Program Files\Debugging Tools for Windows (x64)\symstore.exe" add /compress /s symbols /f %SHADOW_BUILD_DIR%\release\qgroundcontrol.exe /t qgroundcontrol'
-  - ps: %APPVEYOR_BUILD_FOLDER%\deploy\lowercasify_symbolstore.ps1
+  - ps: .\deploy\lowercasify_symbolstore.ps1
 
 
 
