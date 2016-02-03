@@ -17,7 +17,7 @@ install:
   - call "%ProgramFiles(x86)%\Microsoft Visual Studio 12.0\VC\vcvarsall.bat" x86
   - set PATH=C:\Qt\Tools\QtCreator\bin;C:\Qt\5.5\msvc2013\bin;%PATH%
   - mkdir %LOCALAPPDATA%\QtProject && copy test\qtlogging.ini %LOCALAPPDATA%\QtProject\
-  - if "%CONFIG%" EQU "installer" ( cinst nsis.install -y -installArgs /D="%programfiles(x86)%\NSIS" )
+  ;- if "%CONFIG%" EQU "installer" ( cinst nsis.install -y -installArgs /D="%programfiles(x86)%\NSIS" )
 
 build_script:
 # temporary
@@ -26,12 +26,12 @@ build_script:
   - cd %SHADOW_BUILD_DIR% && jom
   - if "%CONFIG%" EQU "installer" ( copy %SHADOW_BUILD_DIR%\release\qgroundcontrol-installer.exe %APPVEYOR_BUILD_FOLDER%\qgroundcontrol-installer.exe )
 # Generate the source server information to embed in the PDB
-  - "C:\Program Files\Debugging Tools for Windows (x64)\srcsrv\srctool.exe" -r -u "%SHADOW_BUILD_DIR%\release\qgroundcontrol.pdb" | grep qgroundcontrol | grep -v moc_ | grep -v libs\\mavlink | grep -v build_windows_install | python %APPVEYOR_BUILD_FOLDER%\deploy\genPDBsrcsrv.py > %SHADOW_BUILD_DIR%\release\qgroundcontrol.pdb.srcsrv
+  - '"C:\Program Files\Debugging Tools for Windows (x64)\srcsrv\srctool.exe" -r -u "%SHADOW_BUILD_DIR%\release\qgroundcontrol.pdb" | grep qgroundcontrol | grep -v moc_ | grep -v libs\\mavlink | grep -v build_windows_install | python %APPVEYOR_BUILD_FOLDER%\deploy\genPDBsrcsrv.py > %SHADOW_BUILD_DIR%\release\qgroundcontrol.pdb.srcsrv'
 #write the source server info
-  - "C:\Program Files\Debugging Tools for Windows (x64)\srcsrv\pdbstr.exe" -w -i %SHADOW_BUILD_DIR%\release\qgroundcontrol.pdb.srcsrv -p:%SHADOW_BUILD_DIR%\release\qgroundcontrol.pdb -s:srcsrv
+  - '"C:\Program Files\Debugging Tools for Windows (x64)\srcsrv\pdbstr.exe" -w -i %SHADOW_BUILD_DIR%\release\qgroundcontrol.pdb.srcsrv -p:%SHADOW_BUILD_DIR%\release\qgroundcontrol.pdb -s:srcsrv'
 # build the symbol / PE store
-  - "C:\Program Files\Debugging Tools for Windows (x64)\symstore.exe" add /compress /s symbols /f %SHADOW_BUILD_DIR%\release\qgroundcontrol.pdb /t qgroundcontrol
-  - "C:\Program Files\Debugging Tools for Windows (x64)\symstore.exe" add /compress /s symbols /f %SHADOW_BUILD_DIR%\release\qgroundcontrol.exe /t qgroundcontrol
+  - '"C:\Program Files\Debugging Tools for Windows (x64)\symstore.exe" add /compress /s symbols /f %SHADOW_BUILD_DIR%\release\qgroundcontrol.pdb /t qgroundcontrol'
+  - '"C:\Program Files\Debugging Tools for Windows (x64)\symstore.exe" add /compress /s symbols /f %SHADOW_BUILD_DIR%\release\qgroundcontrol.exe /t qgroundcontrol'
   - ps: %APPVEYOR_BUILD_FOLDER%\deploy\lowercasify_symbolstore.ps1
 
 
