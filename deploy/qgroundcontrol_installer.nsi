@@ -13,7 +13,7 @@ LicenseData license.txt
 
 Section
   SetOutPath $INSTDIR
-  File /r build_windows_install\release\*.* /x qgroundcontrol.pdb /x qgroundcontrol.lib /x qgroundcontrol.exp
+  File /r /x qgroundcontrol.pdb /x qgroundcontrol.lib /x qgroundcontrol.exp build_windows_install\release\*.* 
   File deploy\px4driver.msi
   WriteUninstaller $INSTDIR\QGroundControl_uninstall.exe
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\QGroundControl" "DisplayName" "QGroundControl"
