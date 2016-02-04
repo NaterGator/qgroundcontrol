@@ -176,13 +176,15 @@ ReleaseBuild {
     CONFIG += ltcg              # Turn on link time code generation
 
     WindowsBuild {
-        # Enable function level linking
-        QMAKE_CFLAGS_RELEASE   += /Gy
-        QMAKE_CXXFLAGS_RELEASE += /Gy
+        # Enable function level linking and enhanced optimized debugging
+        QMAKE_CFLAGS_RELEASE   += /Gy /Zo
+        QMAKE_CXXFLAGS_RELEASE += /Gy /Zo
+        QMAKE_CFLAGS_RELEASE_WITH_DEBUGINFO   += /Gy /Zo
+        QMAKE_CXXFLAGS_RELEASE_WITH_DEBUGINFO += /Gy /Zo
 
         # Eliminate duplicate COMDATs
         QMAKE_LFLAGS_RELEASE += /OPT:ICF
-
+        QMAKE_LFLAGS_RELEASE_WITH_DEBUGINFO += /OPT:ICF
     }
 }
 
