@@ -172,14 +172,17 @@ WindowsBuild {
 
 ReleaseBuild {
     DEFINES += QT_NO_DEBUG
-    WindowsBuild {
-        # Use link time code generation for better optimization (I believe this is supported in MSVC Express, but not 100% sure)
-        QMAKE_LFLAGS_LTCG = /LTCG
-        QMAKE_CFLAGS_LTCG = -GL
+    CONFIG += force_debug_info  # Enable debugging symbols on release builds
+    CONFIG += ltcg              # Turn on link time code generation
 
-        # Turn on debugging information so we can collect good crash dumps from release builds
-        QMAKE_CXXFLAGS_RELEASE += /Zi
-        QMAKE_LFLAGS_RELEASE += /DEBUG
+    WindowsBuild {
+        # Enable function level linking
+        QMAKE_CFLAGS_RELEASE   += /Gy
+        QMAKE_CXXFLAGS_RELEASE += /Gy
+
+        # Eliminate duplicate COMDATs
+        QMAKE_LFLAGS_RELEASE += /OPT:ICF
+
     }
 }
 
