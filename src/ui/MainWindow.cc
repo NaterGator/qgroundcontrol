@@ -56,7 +56,6 @@ This file is part of the QGROUNDCONTROL project
 
 #ifndef __mobile__
 #include "SettingsDialog.h"
-#include "QGCDataPlot2D.h"
 #include "Linecharts.h"
 #include "QGCUASFileViewMulti.h"
 #include "UASQuickView.h"

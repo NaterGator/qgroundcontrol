@@ -216,7 +216,6 @@ FORMS += \
     src/ui/Linechart.ui \
     src/ui/MultiVehicleDockWidget.ui \
     src/ui/MAVLinkSettingsWidget.ui \
-    src/ui/QGCDataPlot2D.ui \
     src/ui/QGCHilConfiguration.ui \
     src/ui/QGCHilFlightGearConfiguration.ui \
     src/ui/QGCHilJSBSimConfiguration.ui \
@@ -324,7 +323,6 @@ HEADERS += \
     src/uas/FileManager.h \
     src/ui/HILDockWidget.h \
     src/ui/linechart/ChartPlot.h \
-    src/ui/linechart/IncrementalPlot.h \
     src/ui/linechart/LinechartPlot.h \
     src/ui/linechart/Linecharts.h \
     src/ui/linechart/LinechartWidget.h \
@@ -339,7 +337,6 @@ HEADERS += \
     src/ui/SettingsDialog.h \
     src/ui/uas/UASMessageView.h \
     src/ui/uas/QGCUnconnectedInfoWidget.h \
-    src/ui/QGCDataPlot2D.h \
     src/ui/QGCHilConfiguration.h \
     src/ui/QGCHilFlightGearConfiguration.h \
     src/ui/QGCHilJSBSimConfiguration.h \
@@ -447,7 +444,6 @@ SOURCES += \
     src/comm/QGCXPlaneLink.cc \
     src/ui/HILDockWidget.cc \
     src/ui/linechart/ChartPlot.cc \
-    src/ui/linechart/IncrementalPlot.cc \
     src/ui/linechart/LinechartPlot.cc \
     src/ui/linechart/Linecharts.cc \
     src/ui/linechart/LinechartWidget.cc \
@@ -455,7 +451,6 @@ SOURCES += \
     src/ui/linechart/ScrollZoomer.cc \
     src/ui/MainWindow.cc \
     src/ui/MultiVehicleDockWidget.cc \
-    src/ui/QGCDataPlot2D.cc \
     src/ui/QGCHilConfiguration.cc \
     src/ui/QGCHilFlightGearConfiguration.cc \
     src/ui/QGCHilJSBSimConfiguration.cc \
