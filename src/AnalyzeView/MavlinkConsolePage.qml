@@ -42,6 +42,7 @@ AnalyzePage {
                 font.family:       ScreenTools.fixedFontFamily
                 font.pointSize:    ScreenTools.defaultFontPointSize
                 readOnly:          true
+                textFormat:        TextEdit.PlainText
 
                 cursorPosition:    conController.cursor
                 text:              conController.text
