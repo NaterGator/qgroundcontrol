@@ -198,7 +198,7 @@ Rectangle {
         anchors.topMargin:  _margin
         anchors.left:       parent.left
         anchors.top:        commandPicker.bottom
-        source:             missionItem.editorQml
+        source:             _currentItem ? missionItem.editorQml : ""
         visible:            _currentItem
 
         property var    masterController:   _masterController
