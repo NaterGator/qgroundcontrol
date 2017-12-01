@@ -8,7 +8,7 @@
  ****************************************************************************/
 
 
-import QtQuick          2.2
+import QtQuick          2.3
 import QtQuick.Controls 1.2
 import QtQuick.Dialogs  1.2
 
@@ -26,6 +26,8 @@ SetupPage {
     pageComponent:      pageComponent
     pageName:           qsTr("Joystick")
     pageDescription:    qsTr("Joystick Setup is used to configure a calibrate joysticks.")
+
+    readonly property real _maxButtons: 16
 
     Connections {
         target: joystickManager
@@ -84,8 +86,6 @@ SetupPage {
                     property int axisValue: 0
                     property int deadbandValue: 0
 
-                    property int            __lastAxisValue:        0
-                    readonly property int   __axisValueMaxJitter:   100
                     property color          __barColor:             qgcPal.windowShade
 
                     // Bar
@@ -105,6 +105,7 @@ SetupPage {
                         width:                  _deadbandWidth
                         height:                 parent.height / 2
                         color:                  "#8c161a"
+                        visible:                controller.deadbandToggle
 
                         property real _percentDeadband:    ((2 * deadbandValue) / (32768.0 * 2))
                         property real _deadbandWidth:   parent.width * _percentDeadband
@@ -203,11 +204,9 @@ SetupPage {
                         }
 
                         Connections {
-                            target: controller
+                            target: _activeJoystick
 
-                            onRollAxisValueChanged: rollLoader.item.axisValue = value
-
-                            onRollAxisDeadbandChanged: rollLoader.item.deadbandValue = value
+                            onManualControl: rollLoader.item.axisValue = roll*32768.0
                         }
                     }
 
@@ -235,12 +234,9 @@ SetupPage {
                         }
 
                         Connections {
-                            target: controller
+                            target: _activeJoystick
 
-                            onPitchAxisValueChanged: pitchLoader.item.axisValue = value
-
-                            onPitchAxisDeadbandChanged: pitchLoader.item.deadbandValue = value
-
+                            onManualControl: pitchLoader.item.axisValue = pitch*32768.0
                         }
                     }
 
@@ -268,11 +264,9 @@ SetupPage {
                         }
 
                         Connections {
-                            target: controller
+                            target: _activeJoystick
 
-                            onYawAxisValueChanged: yawLoader.item.axisValue = value
-
-                            onYawAxisDeadbandChanged: yawLoader.item.deadbandValue = value
+                            onManualControl: yawLoader.item.axisValue = yaw*32768.0
                         }
                     }
 
@@ -300,11 +294,9 @@ SetupPage {
                         }
 
                         Connections {
-                            target: controller
+                            target: _activeJoystick
 
-                            onThrottleAxisValueChanged: throttleLoader.item.axisValue = value
-
-                            onThrottleAxisDeadbandChanged: throttleLoader.item.deadbandValue = value
+                            onManualControl: throttleLoader.item.axisValue = _activeJoystick.negativeThrust ? -throttle*32768.0 : (-2*throttle+1)*32768.0
                         }
                     }
                 } // Column - Attitude Control labels
@@ -461,17 +453,39 @@ SetupPage {
 
                                     onClicked: _activeJoystick.throttleMode = 1
                                 }
+
+                                QGCCheckBox {
+                                    visible:        _activeVehicle.supportsNegativeThrust
+                                    id:             negativeThrust
+                                    text:           qsTr("Allow negative Thrust")
+                                    enabled:        _activeJoystick.negativeThrust = _activeVehicle.supportsNegativeThrust
+                                    checked:        _activeJoystick ? _activeJoystick.negativeThrust : false
+                                    onClicked:      _activeJoystick.negativeThrust = checked
+                                }
                             }
 
                             Column {
                                 spacing: ScreenTools.defaultFontPixelHeight / 3
 
-                                QGCCheckBox {
-                                    id:         exponential
-                                    checked:    _activeJoystick ? _activeJoystick.exponential : false
-                                    text:       qsTr("Use exponential curve on roll, pitch, yaw")
+                                QGCLabel {
+                                    id:                 expoSliderLabel
+                                    text:               qsTr("Exponential:")
+                                }
 
-                                    onClicked:  _activeJoystick.exponential = checked
+                                Row {
+                                    QGCSlider {
+                                        id: expoSlider
+                                        minimumValue: 0
+                                        maximumValue: 0.75
+
+                                        Component.onCompleted: value=-_activeJoystick.exponential
+                                        onValueChanged: _activeJoystick.exponential=-value
+                                     }
+
+                                    QGCLabel {
+                                        id:     expoSliderIndicator
+                                        text:   expoSlider.value.toFixed(2)
+                                    }
                                 }
                             }
 
@@ -557,7 +571,7 @@ SetupPage {
 
                             Repeater {
                                 id:     buttonActionRepeater
-                                model:  _activeJoystick ? _activeJoystick.totalButtonCount : 0
+                                model:  _activeJoystick ? Math.min(_activeJoystick.totalButtonCount, _maxButtons) : 0
 
                                 Row {
                                     spacing: ScreenTools.defaultFontPixelWidth
@@ -624,7 +638,7 @@ SetupPage {
 
                             Repeater {
                                 id:     jsButtonActionRepeater
-                                model:  _activeJoystick ? _activeJoystick.totalButtonCount : 0
+                                model:  _activeJoystick ? Math.min(_activeJoystick.totalButtonCount, _maxButtons) : 0
 
                                 Row {
                                     spacing: ScreenTools.defaultFontPixelWidth
@@ -744,6 +758,12 @@ SetupPage {
                         onAxisValueChanged: {
                             if (axisMonitorRepeater.itemAt(axis)) {
                                 axisMonitorRepeater.itemAt(axis).loader.item.axisValue = value
+                            }
+                        }
+
+                        onAxisDeadbandChanged: {
+                            if (axisMonitorRepeater.itemAt(axis)) {
+                                axisMonitorRepeater.itemAt(axis).loader.item.deadbandValue = value
                             }
                         }
                     }

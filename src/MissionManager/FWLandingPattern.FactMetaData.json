@@ -1,23 +1,26 @@
 [
 {
-    "name":             "Landing distance",
+    "name":             "Landing dist",
     "shortDescription": "Distance between landing and loiter points.",
     "type":             "double",
     "units":            "m",
+    "min":              10,
     "decimalPlaces":    1,
-    "defaultValue":     100.0
+    "defaultValue":     300.0
 },
 {
     "name":             "Landing heading",
-    "shortDescription": "Heading from land point to loiter point.",
+    "shortDescription": "Heading from loiter point to land point.",
     "type":             "double",
     "units":            "deg",
+    "min":              0.0,
+    "max":              360.0,
     "decimalPlaces":    0,
-    "defaultValue":     0.0
+    "defaultValue":     270.0
 },
 {
     "name":             "Loiter altitude",
-    "shortDescription": "Altitude to loiter prior to landing.",
+    "shortDescription": "Aircraft will proceed to the loiter point and loiter until it reaches this altitude. Once altitude is reached the aircraft will proceed to land.",
     "type":             "double",
     "units":            "m",
     "decimalPlaces":    1,
@@ -28,14 +31,26 @@
     "shortDescription": "Loiter radius.",
     "type":             "double",
     "decimalPlaces":    1,
-    "min":              0.1,
+    "min":              1,
     "units":            "m",
     "defaultValue":     75.0
 },
 {
-    "name":             "Clockwise loiter",
-    "shortDescription": "If true, loiter will be clockwise. False, loiter will be counter-clockwise.",
-    "type":             "bool",
-    "defaultValue":     true
+    "name":             "Landing altitude",
+    "shortDescription": "Altitude for landing point.",
+    "type":             "double",
+    "units":            "m",
+    "decimalPlaces":    1,
+    "defaultValue":     0.0
+},
+{
+    "name":             "Descent rate",
+    "shortDescription": "Descent rate between landing and loiter altitude.",
+    "type":             "double",
+    "units":            "%",
+    "min":              0.1,
+    "max":              100,
+    "decimalPlaces":    1,
+    "defaultValue":     12.0
 }
 ]

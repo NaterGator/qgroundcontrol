@@ -43,7 +43,7 @@ class MAVLinkProtocol : public QGCTool
     Q_OBJECT
 
 public:
-    MAVLinkProtocol(QGCApplication* app);
+    MAVLinkProtocol(QGCApplication* app, QGCToolbox* toolbox);
     ~MAVLinkProtocol();
 
     /** @brief Get the human-friendly name of this protocol */
@@ -60,6 +60,10 @@ public:
     /** @brief Get the protocol version */
     int getVersion() {
         return MAVLINK_VERSION;
+    }
+    /** @brief Get the currently configured protocol version */
+    unsigned getCurrentVersion() {
+        return _current_version;
     }
     /**
      * Retrieve a total of all successfully parsed packets for the specified link.
@@ -85,10 +89,13 @@ public:
     /**
      * Reset the counters for all metadata for this link.
      */
-    virtual void resetMetadataForLink(const LinkInterface *link);
+    virtual void resetMetadataForLink(LinkInterface *link);
     
     /// Suspend/Restart logging during replay.
     void suspendLogForReplay(bool suspend);
+
+    /// Set protocol version
+    void setVersion(unsigned version);
 
     // Override from QGCTool
     virtual void setToolbox(QGCToolbox *toolbox);
@@ -108,13 +115,11 @@ public slots:
     /** @brief Store protocol settings */
     void storeSettings();
     
-#ifndef __mobile__
     /// @brief Deletes any log files which are in the temp directory
     static void deleteTempLogFiles(void);
     
     /// Checks for lost log files
     void checkForLostLogFiles(void);
-#endif
 
 protected:
     bool m_enable_version_check; ///< Enable checking of version match of MAV and QGC
@@ -127,6 +132,8 @@ protected:
     int currLossCounter[MAVLINK_COMM_NUM_BUFFERS];        ///< Lost messages during this sample time window. Used for calculating loss %.
     bool versionMismatchIgnore;
     int systemId;
+    unsigned _current_version;
+    unsigned _radio_version_mismatch_count;
 
 signals:
     /// Heartbeat received on link
@@ -158,14 +165,16 @@ signals:
     void radioStatusChanged(LinkInterface* link, unsigned rxerrors, unsigned fixed, int rssi, int remrssi,
     unsigned txbuf, unsigned noise, unsigned remnoise);
     
-    /// @brief Emitted when a temporary log file is ready for saving
-    void saveTempFlightDataLog(QString tempLogfile);
+    /// Emitted when a temporary telemetry log file is ready for saving
+    void saveTelemetryLog(QString tempLogfile);
+
+    /// Emitted when a telemetry log is started to save.
+    void checkTelemetrySavePath(void);
 
 private slots:
-    void _vehicleCountChanged(int count);
+    void _vehicleCountChanged(void);
     
 private:
-#ifndef __mobile__
     bool _closeLogFile(void);
     void _startLogging(void);
     void _stopLogging(void);
@@ -177,7 +186,6 @@ private:
     QGCTemporaryFile    _tempLogFile;            ///< File to log to
     static const char*  _tempLogFileTemplate;    ///< Template for temporary log file
     static const char*  _logFileExtension;       ///< Extension for log files
-#endif
 
     LinkManager*            _linkMgr;
     MultiVehicleManager*    _multiVehicleManager;

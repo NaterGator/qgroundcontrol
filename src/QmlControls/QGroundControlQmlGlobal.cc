@@ -19,12 +19,14 @@
 
 static const char* kQmlGlobalKeyName = "QGCQml";
 
-const char* QGroundControlQmlGlobal::_virtualTabletJoystickKey  = "VirtualTabletJoystick";
-const char* QGroundControlQmlGlobal::_baseFontPointSizeKey      = "BaseDeviceFontPointSize";
+const char* QGroundControlQmlGlobal::_flightMapPositionSettingsGroup =          "FlightMapPosition";
+const char* QGroundControlQmlGlobal::_flightMapPositionLatitudeSettingsKey =    "Latitude";
+const char* QGroundControlQmlGlobal::_flightMapPositionLongitudeSettingsKey =   "Longitude";
+const char* QGroundControlQmlGlobal::_flightMapZoomSettingsKey =                "FlightMapZoom";
 
-QGroundControlQmlGlobal::QGroundControlQmlGlobal(QGCApplication* app)
-    : QGCTool(app)
-    , _flightMapSettings(NULL)
+QGroundControlQmlGlobal::QGroundControlQmlGlobal(QGCApplication* app, QGCToolbox* toolbox)
+    : QGCTool(app, toolbox)
+    , _flightMapInitialZoom(17.0)
     , _linkManager(NULL)
     , _multiVehicleManager(NULL)
     , _mapEngineManager(NULL)
@@ -35,13 +37,8 @@ QGroundControlQmlGlobal::QGroundControlQmlGlobal(QGCApplication* app)
     , _corePlugin(NULL)
     , _firmwarePluginManager(NULL)
     , _settingsManager(NULL)
-    , _virtualTabletJoystick(false)
-    , _baseFontPointSize(0.0)
+    , _skipSetupPage(false)
 {
-    QSettings settings;
-    _virtualTabletJoystick  = settings.value(_virtualTabletJoystickKey, false).toBool();
-    _baseFontPointSize      = settings.value(_baseFontPointSizeKey, 0.0).toDouble();
-
     // We clear the parent on this object since we run into shutdown problems caused by hybrid qml app. Instead we let it leak on shutdown.
     setParent(NULL);
 }
@@ -55,7 +52,6 @@ void QGroundControlQmlGlobal::setToolbox(QGCToolbox* toolbox)
 {
     QGCTool::setToolbox(toolbox);
 
-    _flightMapSettings      = toolbox->flightMapSettings();
     _linkManager            = toolbox->linkManager();
     _multiVehicleManager    = toolbox->multiVehicleManager();
     _mapEngineManager       = toolbox->mapEngineManager();
@@ -66,6 +62,16 @@ void QGroundControlQmlGlobal::setToolbox(QGCToolbox* toolbox)
     _corePlugin             = toolbox->corePlugin();
     _firmwarePluginManager  = toolbox->firmwarePluginManager();
     _settingsManager        = toolbox->settingsManager();
+
+#ifndef __mobile__
+   GPSManager *gpsManager = toolbox->gpsManager();
+   if (gpsManager) {
+       connect(gpsManager, &GPSManager::onConnect, this, &QGroundControlQmlGlobal::_onGPSConnect);
+       connect(gpsManager, &GPSManager::onDisconnect, this, &QGroundControlQmlGlobal::_onGPSDisconnect);
+       connect(gpsManager, &GPSManager::surveyInStatus, this, &QGroundControlQmlGlobal::_GPSSurveyInStatus);
+       connect(gpsManager, &GPSManager::satelliteUpdate, this, &QGroundControlQmlGlobal::_GPSNumSatellites);
+   }
+#endif /* __mobile__ */
 }
 
 void QGroundControlQmlGlobal::saveGlobalSetting (const QString& key, const QString& value)
@@ -141,7 +147,7 @@ void QGroundControlQmlGlobal::startAPMArduSubMockLink(bool sendStatusText)
 #endif
 }
 
-void QGroundControlQmlGlobal::stopAllMockLinks(void)
+void QGroundControlQmlGlobal::stopOneMockLink(void)
 {
 #ifdef QT_DEBUG
     LinkManager* linkManager = qgcApp()->toolbox()->linkManager();
@@ -152,15 +158,10 @@ void QGroundControlQmlGlobal::stopAllMockLinks(void)
 
         if (mockLink) {
             linkManager->disconnectLink(mockLink);
+            return;
         }
     }
 #endif
-}
-
-void QGroundControlQmlGlobal::setIsDarkStyle(bool dark)
-{
-    qgcApp()->setStyle(dark);
-    emit isDarkStyleChanged(dark);
 }
 
 void QGroundControlQmlGlobal::setIsVersionCheckEnabled(bool enable)
@@ -173,26 +174,6 @@ void QGroundControlQmlGlobal::setMavlinkSystemID(int id)
 {
     qgcApp()->toolbox()->mavlinkProtocol()->setSystemId(id);
     emit mavlinkSystemIDChanged(id);
-}
-
-void QGroundControlQmlGlobal::setVirtualTabletJoystick(bool enabled)
-{
-    if (_virtualTabletJoystick != enabled) {
-        QSettings settings;
-        settings.setValue(_virtualTabletJoystickKey, enabled);
-        _virtualTabletJoystick = enabled;
-        emit virtualTabletJoystickChanged(enabled);
-    }
-}
-
-void QGroundControlQmlGlobal::setBaseFontPointSize(qreal size)
-{
-    if (size >= 6.0 && size <= 48.0) {
-        QSettings settings;
-        settings.setValue(_baseFontPointSizeKey, size);
-        _baseFontPointSize = size;
-        emit baseFontPointSizeChanged(size);
-    }
 }
 
 int QGroundControlQmlGlobal::supportedFirmwareCount()
@@ -208,3 +189,75 @@ bool QGroundControlQmlGlobal::linesIntersect(QPointF line1A, QPointF line1B, QPo
     return QLineF(line1A, line1B).intersect(QLineF(line2A, line2B), &intersectPoint) == QLineF::BoundedIntersection &&
             intersectPoint != line1A && intersectPoint != line1B;
 }
+
+void QGroundControlQmlGlobal::setSkipSetupPage(bool skip)
+{
+    if(_skipSetupPage != skip) {
+        _skipSetupPage = skip;
+        emit skipSetupPageChanged();
+    }
+}
+
+QGeoCoordinate QGroundControlQmlGlobal::flightMapPosition(void)
+{
+    QSettings       settings;
+    QGeoCoordinate  coord;
+
+    settings.beginGroup(_flightMapPositionSettingsGroup);
+    coord.setLatitude(settings.value(_flightMapPositionLatitudeSettingsKey, 0).toDouble());
+    coord.setLongitude(settings.value(_flightMapPositionLongitudeSettingsKey, 0).toDouble());
+
+    return coord;
+}
+
+double QGroundControlQmlGlobal::flightMapZoom(void)
+{
+    QSettings settings;
+
+    settings.beginGroup(_flightMapPositionSettingsGroup);
+    return settings.value(_flightMapZoomSettingsKey, 2).toDouble();
+}
+
+void QGroundControlQmlGlobal::setFlightMapPosition(QGeoCoordinate& coordinate)
+{
+    if (coordinate != flightMapPosition()) {
+        QSettings settings;
+
+        settings.beginGroup(_flightMapPositionSettingsGroup);
+        settings.setValue(_flightMapPositionLatitudeSettingsKey, coordinate.latitude());
+        settings.setValue(_flightMapPositionLongitudeSettingsKey, coordinate.longitude());
+        emit flightMapPositionChanged(coordinate);
+    }
+}
+
+void QGroundControlQmlGlobal::setFlightMapZoom(double zoom)
+{
+    if (zoom != flightMapZoom()) {
+        QSettings settings;
+
+        settings.beginGroup(_flightMapPositionSettingsGroup);
+        settings.setValue(_flightMapZoomSettingsKey, zoom);
+        emit flightMapZoomChanged(zoom);
+    }
+}
+
+void QGroundControlQmlGlobal::_onGPSConnect()
+{
+    _gpsRtkFactGroup.connected()->setRawValue(true);
+}
+void QGroundControlQmlGlobal::_onGPSDisconnect()
+{
+    _gpsRtkFactGroup.connected()->setRawValue(false);
+}
+void QGroundControlQmlGlobal::_GPSSurveyInStatus(float duration, float accuracyMM, bool valid, bool active)
+{
+    _gpsRtkFactGroup.currentDuration()->setRawValue(duration);
+    _gpsRtkFactGroup.currentAccuracy()->setRawValue(accuracyMM/1000.0);
+    _gpsRtkFactGroup.valid()->setRawValue(valid);
+    _gpsRtkFactGroup.active()->setRawValue(active);
+}
+void QGroundControlQmlGlobal::_GPSNumSatellites(int numSatellites)
+{
+    _gpsRtkFactGroup.numSatellites()->setRawValue(numSatellites);
+}
+

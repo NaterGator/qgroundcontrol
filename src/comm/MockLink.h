@@ -13,6 +13,7 @@
 
 #include <QMap>
 #include <QLoggingCategory>
+#include <QGeoCoordinate>
 
 #include "MockLinkMissionItemHandler.h"
 #include "MockLinkFileServer.h"
@@ -141,7 +142,7 @@ public:
     /// Reset the state of the MissionItemHandler to no items, no transactions in progress.
     void resetMissionItemHandler(void) { _missionItemHandler.reset(); }
 
-    /// Returns the filename for the simulated log file. Onyl available after a download is requested.
+    /// Returns the filename for the simulated log file. Only available after a download is requested.
     QString logDownloadFile(void) { return _logDownloadFilename; }
 
     static MockLink* startPX4MockLink            (bool sendStatusText, MockConfiguration::FailureMode_t failureMode = MockConfiguration::FailNone);
@@ -192,6 +193,8 @@ private:
     void _sendRCChannels(void);
     void _paramRequestListWorker(void);
     void _logDownloadWorker(void);
+    void _sendADSBVehicles(void);
+    void _moveADSBVehicle(void);
 
     static MockLink* _startMockLink(MockConfiguration* mockConfig);
 
@@ -199,6 +202,7 @@ private:
 
     QString _name;
     bool    _connected;
+    int     _mavlinkChannel;
 
     uint8_t _vehicleSystemId;
     uint8_t _vehicleComponentId;
@@ -215,6 +219,9 @@ private:
 
     MAV_AUTOPILOT       _firmwareType;
     MAV_TYPE            _vehicleType;
+    double              _vehicleLatitude;
+    double              _vehicleLongitude;
+    double              _vehicleAltitude;
 
     MockLinkFileServer* _fileServer;
 
@@ -235,9 +242,12 @@ private:
     uint32_t    _logDownloadCurrentOffset;  ///< Current offset we are sending from
     uint32_t    _logDownloadBytesRemaining; ///< Number of bytes still to send, 0 = send inactive
 
-    static float        _vehicleLatitude;
-    static float        _vehicleLongitude;
-    static float        _vehicleAltitude;
+    QGeoCoordinate  _adsbVehicleCoordinate;
+    double          _adsbAngle;
+
+    static double       _defaultVehicleLatitude;
+    static double       _defaultVehicleLongitude;
+    static double       _defaultVehicleAltitude;
     static int          _nextVehicleSystemId;
     static const char*  _failParam;
 };

@@ -7,14 +7,9 @@
  *
  ****************************************************************************/
 
-
-/**
- * @file
- *   @brief Abstract interface, represents one unmanned aerial vehicle
- *
- *   @author Lorenz Meier <mavteam@student.ethz.ch>
- *
- */
+// NO NEW CODE HERE
+// UASInterface, UAS.h/cc are deprecated. All new functionality should go into Vehicle.h/cc
+//
 
 #ifndef _UASINTERFACE_H_
 #define _UASINTERFACE_H_
@@ -66,6 +61,7 @@ public:
      * @return The next color in the color map. The map holds 20 colors and starts from the beginning
      *         if the colors are exceeded.
      */
+#if !defined(__mobile__)
     static QColor getNextColor() {
         /* Create color map */
         static QList<QColor> colors = QList<QColor>()
@@ -96,6 +92,7 @@ public:
         nextColor++;
         return colors[nextColor];//return the next color
    }
+#endif
 
     virtual QMap<int, QString> getComponents() = 0;
 
@@ -138,10 +135,6 @@ public:
 public slots:
     /** @brief Order the robot to pair its receiver **/
     virtual void pairRX(int rxType, int rxSubType) = 0;
-    /** @brief Order the robot to take a picture **/
-    virtual void takePhoto() {}
-    /** @brief Order the robot to toggle video recording **/
-    virtual void toggleVideo() {}
 
     /** @brief Send the full HIL state to the MAV */
 #ifndef __mobile__

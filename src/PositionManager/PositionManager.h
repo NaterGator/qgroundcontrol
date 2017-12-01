@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include <QtPositioning/qgeopositioninfosource.h>
+#include <QGeoPositionInfoSource>
 
 #include <QVariant>
 
@@ -21,7 +21,7 @@ class QGCPositionManager : public QGCTool {
 
 public:
 
-    QGCPositionManager(QGCApplication* app);
+    QGCPositionManager(QGCApplication* app, QGCToolbox* toolbox);
     ~QGCPositionManager();
 
     enum QGCPositionSource {
@@ -34,8 +34,11 @@ public:
 
     int updateInterval() const;
 
+    void setToolbox(QGCToolbox* toolbox);
+
 private slots:
-    void positionUpdated(const QGeoPositionInfo &update);
+    void _positionUpdated(const QGeoPositionInfo &update);
+    void _error(QGeoPositionInfoSource::Error positioningError);
 
 signals:
     void lastPositionUpdated(bool valid, QVariant lastPosition);

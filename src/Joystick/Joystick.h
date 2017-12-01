@@ -72,7 +72,8 @@ public:
     Q_INVOKABLE QString getButtonAction(int button);
 
     Q_PROPERTY(int throttleMode READ throttleMode WRITE setThrottleMode NOTIFY throttleModeChanged)
-    Q_PROPERTY(bool exponential READ exponential WRITE setExponential NOTIFY exponentialChanged)
+    Q_PROPERTY(bool negativeThrust READ negativeThrust WRITE setNegativeThrust NOTIFY negativeThrustChanged)
+    Q_PROPERTY(float exponential READ exponential WRITE setExponential NOTIFY exponentialChanged)
     Q_PROPERTY(bool accumulator READ accumulator WRITE setAccumulator NOTIFY accumulatorChanged)
 	Q_PROPERTY(bool requiresCalibration READ requiresCalibration CONSTANT)
     
@@ -95,19 +96,22 @@ public:
     QVariantList buttonActions(void);
 
     QString name(void) { return _name; }
-    
+/*
     // Joystick index used by sdl library
-    // Settable because sdl library remaps indicies after certain events
+    // Settable because sdl library remaps indices after certain events
     virtual int index(void) = 0;
     virtual void setIndex(int index) = 0;
-
+*/
 	virtual bool requiresCalibration(void) { return true; }
 
     int throttleMode(void);
     void setThrottleMode(int mode);
 
-    bool exponential(void);
-    void setExponential(bool expo);
+    bool negativeThrust(void);
+    void setNegativeThrust(bool allowNegative);
+
+    float exponential(void);
+    void setExponential(float expo);
 
     bool accumulator(void);
     void setAccumulator(bool accu);
@@ -141,7 +145,9 @@ signals:
 
     void throttleModeChanged(int mode);
 
-    void exponentialChanged(bool exponential);
+    void negativeThrustChanged(bool allowNegative);
+
+    void exponentialChanged(float exponential);
 
     void accumulatorChanged(bool accumulator);
 
@@ -175,6 +181,7 @@ private:
     virtual int _getAxis(int i) = 0;
     virtual uint8_t _getHat(int hat,int i) = 0;
 
+    void _updateTXModeSettingsKey(Vehicle* activeVehicle);
     int _mapFunctionMode(int mode, int function);
     void _remapAxes(int currentMode, int newMode, int (&newMapping)[maxFunction]);
 
@@ -206,7 +213,9 @@ protected:
 
     ThrottleMode_t      _throttleMode;
 
-    bool                _exponential;
+    bool                _negativeThrust;
+
+    float                _exponential;
     bool                _accumulator;
     bool                _deadband;
 

@@ -114,6 +114,7 @@ private:
     void _replayError(const QString& errorMsg);
     quint64 _parseTimestamp(const QByteArray& bytes);
     quint64 _seekToNextMavlinkMessage(mavlink_message_t* nextMsg);
+    quint64 _readNextMavlinkMessage(QByteArray& bytes);
     bool _loadLogFile(void);
     void _finishPlayback(void);
     void _playbackError(void);
@@ -129,9 +130,10 @@ private:
     LogReplayLinkConfiguration* _logReplayConfig;
 
     bool    _connected;
-    QTimer _readTickTimer;      ///< Timer which signals a read of next log record
+    int     _mavlinkChannel;
+    QTimer  _readTickTimer;      ///< Timer which signals a read of next log record
 
-    static const char* _errorTitle; ///< Title for communicatorError signals
+    QString _errorTitle; ///< Title for communicatorError signals
 
     quint64 _logCurrentTimeUSecs;   ///< The timestamp of the next message in the log file.
     quint64 _logStartTimeUSecs;     ///< The first timestamp in the current log file.

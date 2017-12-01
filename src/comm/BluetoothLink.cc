@@ -140,9 +140,6 @@ bool BluetoothLink::_hardwareConnect()
     QObject::connect(_discoveryAgent, &QBluetoothServiceDiscoveryAgent::serviceDiscovered, this, &BluetoothLink::serviceDiscovered);
     QObject::connect(_discoveryAgent, &QBluetoothServiceDiscoveryAgent::finished, this, &BluetoothLink::discoveryFinished);
     QObject::connect(_discoveryAgent, &QBluetoothServiceDiscoveryAgent::canceled, this, &BluetoothLink::discoveryFinished);
-
-    QObject::connect(_discoveryAgent, static_cast<void (QBluetoothServiceDiscoveryAgent::*)(QBluetoothSocket::SocketError)>(&QBluetoothServiceDiscoveryAgent::error),
-            this, &BluetoothLink::discoveryError);
     _shutDown = false;
     _discoveryAgent->start();
 #else
@@ -168,14 +165,6 @@ void BluetoothLink::_createSocket()
     QObject::connect(_targetSocket, static_cast<void (QBluetoothSocket::*)(QBluetoothSocket::SocketError)>(&QBluetoothSocket::error),
             this, &BluetoothLink::deviceError);
 }
-
-#ifdef __ios__
-void BluetoothLink::discoveryError(QBluetoothServiceDiscoveryAgent::Error error)
-{
-    qDebug() << "Discovery error:" << error;
-    qDebug() << _discoveryAgent->errorString();
-}
-#endif
 
 #ifdef __ios__
 void BluetoothLink::serviceDiscovered(const QBluetoothServiceInfo& info)
@@ -224,7 +213,7 @@ void BluetoothLink::deviceError(QBluetoothSocket::SocketError error)
 {
     _connectState = false;
     qWarning() << "Bluetooth error" << error;
-    emit communicationError("Bluetooth Link Error", _targetSocket->errorString());
+    emit communicationError(tr("Bluetooth Link Error"), _targetSocket->errorString());
 }
 
 bool BluetoothLink::isConnected() const

@@ -18,6 +18,8 @@
 #include <QDebug>
 #include <QStack>
 
+static const char* kInvalidConverstion = "Internal Error: No support for string parameters";
+
 QGC_LOGGING_CATEGORY(APMParameterMetaDataLog,           "APMParameterMetaDataLog")
 QGC_LOGGING_CATEGORY(APMParameterMetaDataVerboseLog,    "APMParameterMetaDataVerboseLog")
 
@@ -52,16 +54,21 @@ QVariant APMParameterMetaData::_stringToTypedVariant(const QString& string,
     case FactMetaData::valueTypeFloat:
         convertTo = QMetaType::Float;
         break;
+    case FactMetaData::valueTypeElapsedTimeInSeconds:
     case FactMetaData::valueTypeDouble:
         convertTo = QVariant::Double;
         break;
     case FactMetaData::valueTypeString:
-        qWarning() << "Internal Error: No support for string parameters";
+        qWarning() << kInvalidConverstion;
         convertTo = QVariant::String;
         break;
     case FactMetaData::valueTypeBool:
-        qWarning() << "Internal Error: No support for string parameters";
+        qWarning() << kInvalidConverstion;
         convertTo = QVariant::Bool;
+        break;
+    case FactMetaData::valueTypeCustom:
+        qWarning() << kInvalidConverstion;
+        convertTo = QVariant::ByteArray;
         break;
     }
 
@@ -76,6 +83,13 @@ QString APMParameterMetaData::mavTypeToString(MAV_TYPE vehicleTypeEnum)
 
     switch(vehicleTypeEnum) {
         case MAV_TYPE_FIXED_WING:
+        case MAV_TYPE_VTOL_DUOROTOR:
+        case MAV_TYPE_VTOL_QUADROTOR:
+        case MAV_TYPE_VTOL_TILTROTOR:
+        case MAV_TYPE_VTOL_RESERVED2:
+        case MAV_TYPE_VTOL_RESERVED3:
+        case MAV_TYPE_VTOL_RESERVED4:
+        case MAV_TYPE_VTOL_RESERVED5:
             vehicleName = "ArduPlane";
             break;
         case MAV_TYPE_QUADROTOR:
@@ -104,13 +118,6 @@ QString APMParameterMetaData::mavTypeToString(MAV_TYPE vehicleTypeEnum)
         case MAV_TYPE_FLAPPING_WING:
         case MAV_TYPE_KITE:
         case MAV_TYPE_ONBOARD_CONTROLLER:
-        case MAV_TYPE_VTOL_DUOROTOR:
-        case MAV_TYPE_VTOL_QUADROTOR:
-        case MAV_TYPE_VTOL_TILTROTOR:
-        case MAV_TYPE_VTOL_RESERVED2:
-        case MAV_TYPE_VTOL_RESERVED3:
-        case MAV_TYPE_VTOL_RESERVED4:
-        case MAV_TYPE_VTOL_RESERVED5:
         case MAV_TYPE_GIMBAL:
         case MAV_TYPE_ENUM_END:
         default:
@@ -237,22 +244,19 @@ void APMParameterMetaData::loadParameterFactMetaDataFile(const QString& metaData
                           << "group: " << group;
 
                 Q_ASSERT(!rawMetaData);
-                rawMetaData = new APMFactMetaDataRaw();
                 if (_vehicleTypeToParametersMap[currentCategory].contains(name)) {
-                    // We can't trust the meta dafa since we have dups
-                    qCWarning(APMParameterMetaDataLog) << "Duplicate parameter found:" << name;
-                    badMetaData = true;
+                    qCDebug(APMParameterMetaDataLog) << "Duplicate parameter found:" << name;
+                    rawMetaData = _vehicleTypeToParametersMap[currentCategory][name];
                 } else {
-                    qCDebug(APMParameterMetaDataVerboseLog) << "inserting metadata for field" << name;
+                    rawMetaData = new APMFactMetaDataRaw();
                     _vehicleTypeToParametersMap[currentCategory][name] = rawMetaData;
-                    rawMetaData->name = name;
-                    rawMetaData->group = group;
-                    rawMetaData->shortDescription = shortDescription;
-                    rawMetaData->longDescription = longDescription;
-
                     groupMembers[group] << name;
                 }
-
+                qCDebug(APMParameterMetaDataVerboseLog) << "inserting metadata for field" << name;
+                rawMetaData->name = name;
+                rawMetaData->group = group;
+                rawMetaData->shortDescription = shortDescription;
+                rawMetaData->longDescription = longDescription;
             } else {
                 // We should be getting meta data now
                 if (xmlState.top() != XmlStateFoundParameter) {

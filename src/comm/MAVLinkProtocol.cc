@@ -24,6 +24,8 @@
 #include <QStandardPaths>
 #include <QtEndian>
 #include <QMetaType>
+#include <QDir>
+#include <QFileInfo>
 
 #include "MAVLinkProtocol.h"
 #include "UASInterface.h"
@@ -41,26 +43,24 @@ Q_DECLARE_METATYPE(mavlink_message_t)
 
 QGC_LOGGING_CATEGORY(MAVLinkProtocolLog, "MAVLinkProtocolLog")
 
-#ifndef __mobile__
 const char* MAVLinkProtocol::_tempLogFileTemplate = "FlightDataXXXXXX"; ///< Template for temporary log file
 const char* MAVLinkProtocol::_logFileExtension = "mavlink";             ///< Extension for log files
-#endif
 
 /**
  * The default constructor will create a new MAVLink object sending heartbeats at
  * the MAVLINK_HEARTBEAT_DEFAULT_RATE to all connected links.
  */
-MAVLinkProtocol::MAVLinkProtocol(QGCApplication* app)
-    : QGCTool(app)
+MAVLinkProtocol::MAVLinkProtocol(QGCApplication* app, QGCToolbox* toolbox)
+    : QGCTool(app, toolbox)
     , m_enable_version_check(true)
     , versionMismatchIgnore(false)
     , systemId(255)
-#ifndef __mobile__
+    , _current_version(100)
+    , _radio_version_mismatch_count(0)
     , _logSuspendError(false)
     , _logSuspendReplay(false)
     , _vehicleWasArmed(false)
     , _tempLogFile(QString("%2.%3").arg(_tempLogFileTemplate).arg(_logFileExtension))
-#endif
     , _linkMgr(NULL)
     , _multiVehicleManager(NULL)
 {
@@ -74,10 +74,25 @@ MAVLinkProtocol::MAVLinkProtocol(QGCApplication* app)
 MAVLinkProtocol::~MAVLinkProtocol()
 {
     storeSettings();
-
-#ifndef __mobile__
     _closeLogFile();
-#endif
+}
+
+void MAVLinkProtocol::setVersion(unsigned version)
+{
+    QList<LinkInterface*> links = _linkMgr->links();
+
+    for (int i = 0; i < links.length(); i++) {
+        mavlink_status_t* mavlinkStatus = mavlink_get_channel_status(links[i]->mavlinkChannel());
+
+        // Set flags for version
+        if (version < 200) {
+            mavlinkStatus->flags |= MAVLINK_STATUS_FLAG_OUT_MAVLINK1;
+        } else {
+            mavlinkStatus->flags &= ~MAVLINK_STATUS_FLAG_OUT_MAVLINK1;
+        }
+    }
+
+    _current_version = version;
 }
 
 void MAVLinkProtocol::setToolbox(QGCToolbox *toolbox)
@@ -103,12 +118,12 @@ void MAVLinkProtocol::setToolbox(QGCToolbox *toolbox)
        }
    }
 
-   connect(this, &MAVLinkProtocol::protocolStatusMessage, _app, &QGCApplication::criticalMessageBoxOnMainThread);
-#ifndef __mobile__
-   connect(this, &MAVLinkProtocol::saveTempFlightDataLog, _app, &QGCApplication::saveTempFlightDataLogOnMainThread);
-#endif
+   connect(this, &MAVLinkProtocol::protocolStatusMessage,   _app, &QGCApplication::criticalMessageBoxOnMainThread);
+   connect(this, &MAVLinkProtocol::saveTelemetryLog,        _app, &QGCApplication::saveTelemetryLogOnMainThread);
+   connect(this, &MAVLinkProtocol::checkTelemetrySavePath,  _app, &QGCApplication::checkTelemetrySavePathOnMainThread);
 
-   connect(_multiVehicleManager->vehicles(), &QmlObjectListModel::countChanged, this, &MAVLinkProtocol::_vehicleCountChanged);
+   connect(_multiVehicleManager, &MultiVehicleManager::vehicleAdded, this, &MAVLinkProtocol::_vehicleCountChanged);
+   connect(_multiVehicleManager, &MultiVehicleManager::vehicleRemoved, this, &MAVLinkProtocol::_vehicleCountChanged);
 
    emit versionCheckChanged(m_enable_version_check);
 }
@@ -138,7 +153,7 @@ void MAVLinkProtocol::storeSettings()
     // Parameter interface settings
 }
 
-void MAVLinkProtocol::resetMetadataForLink(const LinkInterface *link)
+void MAVLinkProtocol::resetMetadataForLink(LinkInterface *link)
 {
     int channel = link->mavlinkChannel();
     totalReceiveCounter[channel] = 0;
@@ -146,6 +161,7 @@ void MAVLinkProtocol::resetMetadataForLink(const LinkInterface *link)
     totalErrorCounter[channel] = 0;
     currReceiveCounter[channel] = 0;
     currLossCounter[channel] = 0;
+    link->setDecodedFirstMavlinkPacket(false);
 }
 
 /**
@@ -180,9 +196,9 @@ void MAVLinkProtocol::receiveBytes(LinkInterface* link, QByteArray b)
         if (decodeState == 0 && !link->decodedFirstMavlinkPacket())
         {
             nonmavlinkCount++;
-            if (nonmavlinkCount > 2000 && !warnedUserNonMavlink)
+            if (nonmavlinkCount > 1000 && !warnedUserNonMavlink)
             {
-                //2000 bytes with no mavlink message. Are we connected to a mavlink capable device?
+                // 500 bytes with no mavlink message. Are we connected to a mavlink capable device?
                 if (!checkedUserNonMavlink)
                 {
                     link->requestReset();
@@ -191,55 +207,30 @@ void MAVLinkProtocol::receiveBytes(LinkInterface* link, QByteArray b)
                 else
                 {
                     warnedUserNonMavlink = true;
-                    emit protocolStatusMessage(tr("MAVLink Protocol"), tr("There is a MAVLink Version or Baud Rate Mismatch. "
-                                                                          "Please check if the baud rates of QGroundControl and your autopilot are the same."));
+                    // Disconnect the link since its some other device and
+                    // QGC clinging on to it and feeding it data might have unintended
+                    // side effects (e.g. if its a modem)
+                    qDebug() << "disconnected link" << link->getName() << "as it contained no MAVLink data";
+                    QMetaObject::invokeMethod(_linkMgr, "disconnectLink", Q_ARG( LinkInterface*, link ) );
+                    return;
                 }
             }
         }
         if (decodeState == 1)
         {
             if (!link->decodedFirstMavlinkPacket()) {
+                link->setDecodedFirstMavlinkPacket(true);
                 mavlink_status_t* mavlinkStatus = mavlink_get_channel_status(mavlinkChannel);
                 if (!(mavlinkStatus->flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1) && (mavlinkStatus->flags & MAVLINK_STATUS_FLAG_OUT_MAVLINK1)) {
                     qDebug() << "Switching outbound to mavlink 2.0 due to incoming mavlink 2.0 packet:" << mavlinkStatus << mavlinkChannel << mavlinkStatus->flags;
                     mavlinkStatus->flags &= ~MAVLINK_STATUS_FLAG_OUT_MAVLINK1;
+
+                    // Set all links to v2
+                    setVersion(200);
                 }
-                link->setDecodedFirstMavlinkPacket(true);
             }
 
-            if(message.msgid == MAVLINK_MSG_ID_RADIO_STATUS)
-            {
-                // process telemetry status message
-                mavlink_radio_status_t rstatus;
-                mavlink_msg_radio_status_decode(&message, &rstatus);
-                int rssi = rstatus.rssi,
-                    remrssi = rstatus.remrssi;
-                // 3DR Si1k radio needs rssi fields to be converted to dBm
-                if (message.sysid == '3' && message.compid == 'D') {
-                    /* Per the Si1K datasheet figure 23.25 and SI AN474 code
-                     * samples the relationship between the RSSI register
-                     * and received power is as follows:
-                     *
-                     *                       10
-                     * inputPower = rssi * ------ 127
-                     *                       19
-                     *
-                     * Additionally limit to the only realistic range [-120,0] dBm
-                     */
-                    rssi    = qMin(qMax(qRound(static_cast<qreal>(rssi)    / 1.9 - 127.0), - 120), 0);
-                    remrssi = qMin(qMax(qRound(static_cast<qreal>(remrssi) / 1.9 - 127.0), - 120), 0);
-                } else {
-                    rssi = (int8_t) rstatus.rssi;
-                    remrssi = (int8_t) rstatus.remrssi;
-                }
-
-                emit radioStatusChanged(link, rstatus.rxerrors, rstatus.fixed, rssi, remrssi,
-                    rstatus.txbuf, rstatus.noise, rstatus.remnoise);
-            }
-
-#ifndef __mobile__
             // Log data
-
             if (!_logSuspendError && !_logSuspendReplay && _tempLogFile.isOpen()) {
                 uint8_t buf[MAVLINK_MAX_PACKET_LEN+sizeof(quint64)];
 
@@ -274,17 +265,33 @@ void MAVLinkProtocol::receiveBytes(LinkInterface* link, QByteArray b)
                     }
                 }
             }
-#endif
 
             if (message.msgid == MAVLINK_MSG_ID_HEARTBEAT) {
-#ifndef __mobile__
                 // Start loggin on first heartbeat
                 _startLogging();
-#endif
-
                 mavlink_heartbeat_t heartbeat;
                 mavlink_msg_heartbeat_decode(&message, &heartbeat);
                 emit vehicleHeartbeatInfo(link, message.sysid, message.compid, heartbeat.mavlink_version, heartbeat.autopilot, heartbeat.type);
+            }
+
+            // Detect if we are talking to an old radio not supporting v2
+            mavlink_status_t* mavlinkStatus = mavlink_get_channel_status(mavlinkChannel);
+            if (message.msgid == MAVLINK_MSG_ID_RADIO_STATUS) {
+                if ((mavlinkStatus->flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1)
+                && !(mavlinkStatus->flags & MAVLINK_STATUS_FLAG_OUT_MAVLINK1)) {
+
+                    _radio_version_mismatch_count++;
+                }
+            }
+
+            if (_radio_version_mismatch_count == 5) {
+                // Warn the user if the radio continues to send v1 while the link uses v2
+                emit protocolStatusMessage(tr("MAVLink Protocol"), tr("Detected radio still using MAVLink v1.0 on a link with MAVLink v2.0 enabled. Please upgrade the radio firmware."));
+                // Ensure the warning can't get stuck
+                _radio_version_mismatch_count++;
+                // Flick link back to v1
+                qDebug() << "Switching outbound to mavlink 1.0 due to incoming mavlink 1.0 packet:" << mavlinkStatus << mavlinkChannel << mavlinkStatus->flags;
+                mavlinkStatus->flags |= MAVLINK_STATUS_FLAG_OUT_MAVLINK1;
             }
 
             // Increase receive counter
@@ -369,19 +376,16 @@ void MAVLinkProtocol::enableVersionCheck(bool enabled)
     emit versionCheckChanged(enabled);
 }
 
-void MAVLinkProtocol::_vehicleCountChanged(int count)
+void MAVLinkProtocol::_vehicleCountChanged(void)
 {
-#ifndef __mobile__
+    int count = _multiVehicleManager->vehicles()->count();
     if (count == 0) {
         // Last vehicle is gone, close out logging
         _stopLogging();
+        _radio_version_mismatch_count = 0;
     }
-#else
-    Q_UNUSED(count);
-#endif
 }
 
-#ifndef __mobile__
 /// @brief Closes the log file if it is open
 bool MAVLinkProtocol::_closeLogFile(void)
 {
@@ -396,12 +400,23 @@ bool MAVLinkProtocol::_closeLogFile(void)
             return true;
         }
     }
-
     return false;
 }
 
 void MAVLinkProtocol::_startLogging(void)
 {
+    //-- Are we supposed to write logs?
+    if (qgcApp()->runningUnitTests()) {
+        return;
+    }
+#ifdef __mobile__
+    //-- Mobile build don't write to /tmp unless told to do so
+    if (!_app->toolbox()->settingsManager()->appSettings()->telemetrySave()->rawValue().toBool()) {
+        return;
+    }
+#endif
+    //-- Log is always written to a temp file. If later the user decides they want
+    //   it, it's all there for them.
     if (!_tempLogFile.isOpen()) {
         if (!_logSuspendReplay) {
             if (!_tempLogFile.open()) {
@@ -413,6 +428,7 @@ void MAVLinkProtocol::_startLogging(void)
             }
 
             qDebug() << "Temp log" << _tempLogFile.fileName();
+            emit checkTelemetrySavePath();
 
             _logSuspendError = false;
         }
@@ -421,13 +437,14 @@ void MAVLinkProtocol::_startLogging(void)
 
 void MAVLinkProtocol::_stopLogging(void)
 {
-    if (_closeLogFile()) {
-        // If the signals are not connected it means we are running a unit test. In that case just delete log files
-        SettingsManager* settingsManager = _app->toolbox()->settingsManager();
-        if ((_vehicleWasArmed || settingsManager->appSettings()->promptFlightTelemetrySaveNotArmed()->rawValue().toBool()) && settingsManager->appSettings()->promptFlightTelemetrySave()->rawValue().toBool()) {
-            emit saveTempFlightDataLog(_tempLogFile.fileName());
-        } else {
-            QFile::remove(_tempLogFile.fileName());
+    if (_tempLogFile.isOpen()) {
+        if (_closeLogFile()) {
+            if ((_vehicleWasArmed || _app->toolbox()->settingsManager()->appSettings()->telemetrySaveNotArmed()->rawValue().toBool()) &&
+                _app->toolbox()->settingsManager()->appSettings()->telemetrySave()->rawValue().toBool()) {
+                emit saveTelemetryLog(_tempLogFile.fileName());
+            } else {
+                QFile::remove(_tempLogFile.fileName());
+            }
         }
     }
     _vehicleWasArmed = false;
@@ -442,22 +459,16 @@ void MAVLinkProtocol::checkForLostLogFiles(void)
 
     QString filter(QString("*.%1").arg(_logFileExtension));
     QFileInfoList fileInfoList = tempDir.entryInfoList(QStringList(filter), QDir::Files);
-    qDebug() << "Orphaned log file count" << fileInfoList.count();
+    //qDebug() << "Orphaned log file count" << fileInfoList.count();
 
     foreach(const QFileInfo fileInfo, fileInfoList) {
-        qDebug() << "Orphaned log file" << fileInfo.filePath();
+        //qDebug() << "Orphaned log file" << fileInfo.filePath();
         if (fileInfo.size() == 0) {
             // Delete all zero length files
             QFile::remove(fileInfo.filePath());
             continue;
         }
-
-        // Give the user a chance to save the orphaned log file
-        emit protocolStatusMessage(tr("Found unsaved Flight Data"),
-                                   tr("This can happen if QGroundControl crashes during Flight Data collection. "
-                                      "If you want to save the unsaved Flight Data, select the file you want to save it to. "
-                                      "If you do not want to keep the Flight Data, select 'Cancel' on the next dialog."));
-        emit saveTempFlightDataLog(fileInfo.filePath());
+        emit saveTelemetryLog(fileInfo.filePath());
     }
 }
 
@@ -477,4 +488,4 @@ void MAVLinkProtocol::deleteTempLogFiles(void)
         QFile::remove(fileInfo.filePath());
     }
 }
-#endif
+

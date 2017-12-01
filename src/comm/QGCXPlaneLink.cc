@@ -202,7 +202,7 @@ void QGCXPlaneLink::run()
     struct iset_struct
     {
         char b[5];
-        int index; // (0->20 in the lsit below)
+        int index; // (0->20 in the list below)
         char str_ipad_them[16];
         char str_port_them[6];
         char padding[2];
@@ -635,9 +635,10 @@ void QGCXPlaneLink::readBytes()
 
             if (p.index == 3)
             {
-                ind_airspeed = p.f[5] * 0.44704f;
-                true_airspeed = p.f[6] * 0.44704f;
-                groundspeed = p.f[7] * 0.44704;
+                float knotsToMetersPerSecond = 0.514444f;
+                ind_airspeed = p.f[5] * knotsToMetersPerSecond;
+                true_airspeed = p.f[6] * knotsToMetersPerSecond;
+                groundspeed = p.f[7] * knotsToMetersPerSecond;
 
                 //qDebug() << "SPEEDS:" << "airspeed" << airspeed << "m/s, groundspeed" << groundspeed << "m/s";
             }

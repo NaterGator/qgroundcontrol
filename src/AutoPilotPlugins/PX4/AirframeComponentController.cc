@@ -57,7 +57,9 @@ AirframeComponentController::AirframeComponentController(void) :
             Q_CHECK_PTR(pInfo);
 
             if (_autostartId == pInfo->autostartId) {
-                Q_ASSERT(!autostartFound);
+                if (autostartFound) {
+                    qWarning() << "AirframeComponentController::AirframeComponentController duplicate ids found:" << _autostartId;
+                }
                 autostartFound = true;
                 _currentAirframeType = pType->name;
                 _currentVehicleName = pInfo->name;
@@ -83,7 +85,7 @@ AirframeComponentController::~AirframeComponentController()
 void AirframeComponentController::changeAutostart(void)
 {
     if (qgcApp()->toolbox()->multiVehicleManager()->vehicles()->count() > 1) {
-        qgcApp()->showMessage("You cannot change airframe configuration while connected to multiple vehicles.");
+        qgcApp()->showMessage(tr("You cannot change airframe configuration while connected to multiple vehicles."));
 		return;
 	}
 	

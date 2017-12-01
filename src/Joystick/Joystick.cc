@@ -55,7 +55,8 @@ Joystick::Joystick(const QString& name, int axisCount, int buttonCount, int hatC
     , _rgButtonValues(NULL)
     , _lastButtonBits(0)
     , _throttleMode(ThrottleModeCenterZero)
-    , _exponential(false)
+    , _negativeThrust(false)
+    , _exponential(0)
     , _accumulator(false)
     , _deadband(false)
     , _activeVehicle(NULL)
@@ -73,6 +74,8 @@ Joystick::Joystick(const QString& name, int axisCount, int buttonCount, int hatC
     for (int i=0; i<_totalButtonCount; i++) {
         _rgButtonValues[i] = false;
     }
+
+    _updateTXModeSettingsKey(_multiVehicleManager->activeVehicle());
 
     _loadSettings();
 
@@ -109,7 +112,7 @@ void Joystick::_setDefaultCalibration(void) {
     _rgFunctionAxis[yawFunction]        = 0;
     _rgFunctionAxis[throttleFunction]   = 1;
 
-    _exponential = false;
+    _exponential = 0;
     _accumulator = false;
     _deadband = false;
     _throttleMode = ThrottleModeCenterZero;
@@ -118,7 +121,7 @@ void Joystick::_setDefaultCalibration(void) {
     _saveSettings();
 }
 
-void Joystick::_activeVehicleChanged(Vehicle *activeVehicle)
+void Joystick::_updateTXModeSettingsKey(Vehicle* activeVehicle)
 {
     if(activeVehicle) {
         if(activeVehicle->fixedWing()) {
@@ -136,7 +139,16 @@ void Joystick::_activeVehicleChanged(Vehicle *activeVehicle)
             qWarning() << "No valid joystick TXmode settings key for selected vehicle";
             return;
         }
+    } else {
+        _txModeSettingsKey = NULL;
+    }
+}
 
+void Joystick::_activeVehicleChanged(Vehicle* activeVehicle)
+{
+    _updateTXModeSettingsKey(activeVehicle);
+
+    if(activeVehicle) {
         QSettings settings;
         settings.beginGroup(_settingsGroup);
         int mode = settings.value(_txModeSettingsKey, activeVehicle->firmwarePlugin()->defaultJoystickTXMode()).toInt();
@@ -151,8 +163,10 @@ void Joystick::_loadSettings(void)
 
     settings.beginGroup(_settingsGroup);
 
-    if(_txModeSettingsKey)
-        _transmitterMode = settings.value(_txModeSettingsKey, 2).toInt();
+    Vehicle* activeVehicle = _multiVehicleManager->activeVehicle();
+
+    if(_txModeSettingsKey && activeVehicle)
+        _transmitterMode = settings.value(_txModeSettingsKey, activeVehicle->firmwarePlugin()->defaultJoystickTXMode()).toInt();
 
     settings.beginGroup(_name);
 
@@ -162,7 +176,7 @@ void Joystick::_loadSettings(void)
     qCDebug(JoystickLog) << "_loadSettings " << _name;
 
     _calibrated = settings.value(_calibratedSettingsKey, false).toBool();
-    _exponential = settings.value(_exponentialSettingsKey, false).toBool();
+    _exponential = settings.value(_exponentialSettingsKey, 0).toFloat();
     _accumulator = settings.value(_accumulatorSettingsKey, false).toBool();
     _deadband = settings.value(_deadbandSettingsKey, false).toBool();
 
@@ -339,13 +353,20 @@ float Joystick::_adjustRange(int value, Calibration_t calibration, bool withDead
         axisLength =  calibration.center - calibration.min;
     }
 
-    if (withDeadbands) {
-        if (valueNormalized>calibration.deadband) valueNormalized-=calibration.deadband;
-        else if (valueNormalized<-calibration.deadband) valueNormalized+=calibration.deadband;
-        else valueNormalized = 0.f;
-    }
+    float axisPercent;
 
-    float axisPercent = valueNormalized / axisLength;
+    if (withDeadbands) {
+        if (valueNormalized>calibration.deadband) {
+            axisPercent = (valueNormalized - calibration.deadband) / (axisLength - calibration.deadband);
+        } else if (valueNormalized<-calibration.deadband) {
+            axisPercent = (valueNormalized + calibration.deadband) / (axisLength - calibration.deadband);
+        } else {
+            axisPercent = 0.f;
+        }
+    }
+    else {
+        axisPercent = valueNormalized / axisLength;
+    }
 
     float correctedValue = axisBasis * axisPercent;
 
@@ -443,21 +464,21 @@ void Joystick::run(void)
             yaw =       std::max(-1.0f, std::min(tanf(asinf(yaw_limited)), 1.0f));
             throttle =  std::max(-1.0f, std::min(tanf(asinf(throttle_limited)), 1.0f));
             
-            if ( _exponential ) {
+            if ( _exponential != 0 ) {
                 // Exponential (0% to -50% range like most RC radios)
-                // 0 for no exponential
-                // -0.5 for strong exponential
-                float expo = -0.35f;
+                //_exponential is set by a slider in joystickConfig.qml
 
                 // Calculate new RPY with exponential applied
-                roll =      -expo*powf(roll,3) + (1+expo)*roll;
-                pitch =     -expo*powf(pitch,3) + (1+expo)*pitch;
-                yaw =       -expo*powf(yaw,3) + (1+expo)*yaw;
+                roll =      -_exponential*powf(roll,3) + (1+_exponential)*roll;
+                pitch =     -_exponential*powf(pitch,3) + (1+_exponential)*pitch;
+                yaw =       -_exponential*powf(yaw,3) + (1+_exponential)*yaw;
             }
 
             // Adjust throttle to 0:1 range
             if (_throttleMode == ThrottleModeCenterZero && _activeVehicle->supportsThrottleModeCenterZero()) {
-                throttle = std::max(0.0f, throttle);
+                if (!_activeVehicle->supportsNegativeThrust() || !_negativeThrust) {
+                    throttle = std::max(0.0f, throttle);
+                }
             } else {
                 throttle = (throttle + 1.0f) / 2.0f;
             }
@@ -682,12 +703,28 @@ void Joystick::setThrottleMode(int mode)
     emit throttleModeChanged(_throttleMode);
 }
 
-bool Joystick::exponential(void)
+bool Joystick::negativeThrust(void)
+{
+    return _negativeThrust;
+}
+
+void Joystick::setNegativeThrust(bool allowNegative)
+{
+    if (_negativeThrust == allowNegative) {
+        return;
+    }
+    _negativeThrust = allowNegative;
+
+    _saveSettings();
+    emit negativeThrustChanged(_negativeThrust);
+}
+
+float Joystick::exponential(void)
 {
     return _exponential;
 }
 
-void Joystick::setExponential(bool expo)
+void Joystick::setExponential(float expo)
 {
     _exponential = expo;
 

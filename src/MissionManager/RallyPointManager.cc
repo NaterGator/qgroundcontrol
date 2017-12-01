@@ -39,6 +39,18 @@ void RallyPointManager::loadFromVehicle(void)
 
 void RallyPointManager::sendToVehicle(const QList<QGeoCoordinate>& rgPoints)
 {
-    Q_UNUSED(rgPoints);
     // No support in generic vehicle
+    Q_UNUSED(rgPoints);
+    emit sendComplete(false /* error */);
+}
+
+void RallyPointManager::removeAll(void)
+{
+    // No support in generic vehicle
+    emit removeAllComplete(false /* error */);
+}
+
+bool RallyPointManager::supported(void) const
+{
+    return (_vehicle->capabilityBits() & MAV_PROTOCOL_CAPABILITY_MISSION_RALLY) && (_vehicle->maxProtoVersion() >= 200);
 }

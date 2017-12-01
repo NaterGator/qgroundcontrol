@@ -37,9 +37,10 @@
 #include "LogCompressor.h"
 #include "QGC.h"
 #include "MG.h"
-#include "QGCFileDialog.h"
+#include "QGCQFileDialog.h"
 #include "QGCMessageBox.h"
 #include "QGCApplication.h"
+#include "SettingsManager.h"
 
 LinechartWidget::LinechartWidget(int systemid, QWidget *parent) : QWidget(parent),
     sysid(systemid),
@@ -86,7 +87,7 @@ LinechartWidget::LinechartWidget(int systemid, QWidget *parent) : QWidget(parent
     // Create curve list headings
     connect(ui.recolorButton, &QPushButton::clicked, this, &LinechartWidget::recolor);
     connect(ui.shortNameCheckBox, &QCheckBox::clicked, this, &LinechartWidget::setShortNames);
-    connect(ui.plotFilterLineEdit, &QLineEdit::textChanged, this, &LinechartWidget::filterCurves);
+    connect(ui.plotFilterLineEdit, &QLineEdit::textChanged, this, &LinechartWidget::_restartFilterTimeout);
     QShortcut *shortcut  = new QShortcut(this);
     shortcut->setKey(QKeySequence(Qt::CTRL + Qt::Key_F));
     connect(shortcut, &QShortcut::activated, this, &LinechartWidget::setPlotFilterLineEditFocus);
@@ -116,7 +117,7 @@ LinechartWidget::LinechartWidget(int systemid, QWidget *parent) : QWidget(parent
     createLayout();
 
     // And make sure we're listening for future style changes
-    connect(qgcApp(), &QGCApplication::styleChanged, this, &LinechartWidget::recolor);
+    connect(qgcApp()->toolbox()->settingsManager()->appSettings()->indoorPalette(), &Fact::rawValueChanged, this, &LinechartWidget::recolor);
 
     updateTimer->setInterval(updateInterval);
     connect(updateTimer, &QTimer::timeout, this, &LinechartWidget::refresh);
@@ -125,6 +126,9 @@ LinechartWidget::LinechartWidget(int systemid, QWidget *parent) : QWidget(parent
     readSettings();
     pUnit->setVisible(ui.showUnitsCheckBox->isChecked());
     connect(ui.showUnitsCheckBox, &QCheckBox::clicked, pUnit, &QLabel::setVisible);
+
+    _filterTimer.setInterval(500);
+    connect(&_filterTimer, &QTimer::timeout, this, &LinechartWidget::_filterTimeout);
 }
 
 LinechartWidget::~LinechartWidget()
@@ -242,21 +246,21 @@ void LinechartWidget::createLayout()
 
     hlayout->addStretch();
 
-    QLabel *timeScaleLabel = new QLabel("Time axis:");
+    QLabel *timeScaleLabel = new QLabel(tr("Time axis:"));
     hlayout->addWidget(timeScaleLabel);
 
     timeScaleCmb = new QComboBox(this);
-    timeScaleCmb->addItem("10 seconds", 10);
-    timeScaleCmb->addItem("20 seconds", 20);
-    timeScaleCmb->addItem("30 seconds", 30);
-    timeScaleCmb->addItem("40 seconds", 40);
-    timeScaleCmb->addItem("50 seconds", 50);
-    timeScaleCmb->addItem("1 minute", 60);
-    timeScaleCmb->addItem("2 minutes", 60*2);
-    timeScaleCmb->addItem("3 minutes", 60*3);
-    timeScaleCmb->addItem("4 minutes", 60*4);
-    timeScaleCmb->addItem("5 minutes", 60*5);
-    timeScaleCmb->addItem("10 minutes", 60*10);
+    timeScaleCmb->addItem(tr("10 seconds"), 10);
+    timeScaleCmb->addItem(tr("20 seconds"), 20);
+    timeScaleCmb->addItem(tr("30 seconds"), 30);
+    timeScaleCmb->addItem(tr("40 seconds"), 40);
+    timeScaleCmb->addItem(tr("50 seconds"), 50);
+    timeScaleCmb->addItem(tr("1 minute"), 60);
+    timeScaleCmb->addItem(tr("2 minutes"), 60*2);
+    timeScaleCmb->addItem(tr("3 minutes"), 60*3);
+    timeScaleCmb->addItem(tr("4 minutes"), 60*4);
+    timeScaleCmb->addItem(tr("5 minutes"), 60*5);
+    timeScaleCmb->addItem(tr("10 minutes"), 60*10);
     //timeScaleCmb->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     timeScaleCmb->setMinimumContentsLength(12);
 
@@ -432,7 +436,7 @@ void LinechartWidget::startLogging()
     // Let user select the log file name
     // QDate date(QDate::currentDate());
     // QString("./pixhawk-log-" + date.toString("yyyy-MM-dd") + "-" + QString::number(logindex) + ".log")
-    QString fileName = QGCFileDialog::getSaveFileName(this,
+    QString fileName = QGCQFileDialog::getSaveFileName(this,
         tr("Save Log File"),
         QStandardPaths::writableLocation(QStandardPaths::DesktopLocation),
         tr("Log Files (*.log)"),
@@ -637,7 +641,7 @@ void LinechartWidget::removeCurve(QString curve)
 
 void LinechartWidget::recolor()
 {
-    activePlot->styleChanged(qgcApp()->styleIsDark());
+    activePlot->styleChanged(qgcApp()->toolbox()->settingsManager()->appSettings()->indoorPalette()->rawValue().toBool());
     foreach (const QString &key, colorIcons.keys())
     {
         QWidget* colorIcon = colorIcons.value(key, 0);
@@ -668,6 +672,16 @@ void LinechartWidget::filterCurve(const QString &key, bool match)
             curveUnits[key]->setVisible(match && ui.showUnitsCheckBox->isChecked());
             checkBoxes[key]->setVisible(match);
         }
+}
+
+void LinechartWidget::_restartFilterTimeout(void)
+{
+    _filterTimer.start();
+}
+
+void LinechartWidget::_filterTimeout(void)
+{
+    filterCurves(ui.plotFilterLineEdit->text());
 }
 
 void LinechartWidget::filterCurves(const QString &filter)

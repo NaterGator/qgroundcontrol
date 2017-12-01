@@ -7,14 +7,9 @@
  *
  ****************************************************************************/
 
-
-/**
- * @file
- *   @brief Definition of Unmanned Aerial Vehicle object
- *
- *   @author Lorenz Meier <mavteam@student.ethz.ch>
- *
- */
+// NO NEW CODE HERE
+// UASInterface, UAS.h/cc are deprecated. All new functionality should go into Vehicle.h/cc
+//
 
 #ifndef _UAS_H_
 #define _UAS_H_
@@ -262,10 +257,6 @@ public:
 public slots:
     /** @brief Order the robot to pair its receiver **/
     void pairRX(int rxType, int rxSubType);
-    /** @brief Order the robot to take a picture **/
-    void takePhoto();
-    /** @brief Order the robot to toggle video recording **/
-    void toggleVideo();
 
     /** @brief Enable / disable HIL */
 #ifndef __mobile__
@@ -357,8 +348,9 @@ protected:
 
     virtual void processParamValueMsg(mavlink_message_t& msg, const QString& paramName,const mavlink_param_value_t& rawValue, mavlink_param_union_t& paramValue);
 
-    int componentID[256];
-    bool componentMulti[256];
+    QMap<int, int>componentID;
+    QMap<int, bool>componentMulti;
+
     bool connectionLost; ///< Flag indicates a timed out connection
     quint64 connectionLossTime; ///< Time the connection was interrupted
     quint64 lastVoltageWarning; ///< Time at which the last voltage warning occurred

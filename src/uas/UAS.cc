@@ -7,7 +7,9 @@
  *
  ****************************************************************************/
 
-// THIS CLASS IS DEPRECATED. ALL NEW FUNCTIONALITY SHOULD GO INTO Vehicle class
+// NO NEW CODE HERE
+// UASInterface, UAS.h/cc are deprecated. All new functionality should go into Vehicle.h/cc
+//
 
 #include <QList>
 #include <QTimer>
@@ -24,7 +26,7 @@
 #include "UAS.h"
 #include "LinkInterface.h"
 #include "QGC.h"
-#include "GAudioOutput.h"
+#include "AudioOutput.h"
 #include "MAVLinkProtocol.h"
 #include "QGCMAVLink.h"
 #include "LinkManager.h"
@@ -129,17 +131,11 @@ UAS::UAS(MAVLinkProtocol* protocol, Vehicle* vehicle, FirmwarePluginManager * fi
     _firmwarePluginManager(firmwarePluginManager)
 {
 
-    for (unsigned int i = 0; i<255;++i)
-    {
-        componentID[i] = -1;
-        componentMulti[i] = false;
-    }
-
 #ifndef __mobile__
     connect(_vehicle, &Vehicle::mavlinkMessageReceived, &fileManager, &FileManager::receiveMessage);
+    color = UASInterface::getNextColor();
 #endif
 
-    color = UASInterface::getNextColor();
 }
 
 /**
@@ -208,10 +204,11 @@ void UAS::receiveMessage(mavlink_message_t message)
         }
 
         // Store component ID
-        if (componentID[message.msgid] == -1)
+        if (!componentID.contains(message.msgid))
         {
             // Prefer the first component
             componentID[message.msgid] = message.compid;
+            componentMulti[message.msgid] = false;
         }
         else
         {
@@ -223,7 +220,9 @@ void UAS::receiveMessage(mavlink_message_t message)
             }
         }
 
-        if (componentMulti[message.msgid] == true) multiComponentSourceDetected = true;
+        if (componentMulti[message.msgid] == true) {
+            multiComponentSourceDetected = true;
+        }
 
 
         switch (message.msgid)
@@ -1219,40 +1218,6 @@ void UAS::pairRX(int rxType, int rxSubType)
                                  true,                              // showError
                                  rxType,
                                  rxSubType);
-    }
-}
-
-/**
-* Order the robot to take a picture (Testing -- Incomplete API)
-*/
-void UAS::takePhoto()
-{
-    if (_vehicle) {
-        _vehicle->sendMavCommand(_vehicle->defaultComponentId(),    // target component
-                                 MAV_CMD_IMAGE_START_CAPTURE,       // command id
-                                 true,                              // showError
-                                 0,                                 // Duration between two consecutive pictures (in seconds)
-                                 1,                                 // Number of images to capture total - 0 for unlimited capture
-                                 0,                                 // Resolution in megapixels (0.3 for 640x480, 1.3 for 1280x720, etc), set to 0 if param 4/5 are used
-                                 1920,                              // Resolution horizontal in pixels
-                                 1080);                             // Resolution horizontal in pixels
-    }
-}
-
-/**
-* Order the robot to toggle video recording (Testing -- Incomplete API)
-*/
-void UAS::toggleVideo()
-{
-    if (_vehicle) {
-        _vehicle->sendMavCommand(_vehicle->defaultComponentId(),    // target component
-                                 MAV_CMD_VIDEO_START_CAPTURE,       // command id
-                                 true,                              // showError
-                                 0,                                 // Camera ID (0 for all cameras), 1 for first, 2 for second, etc.
-                                 60,                                // Frames per second
-                                 0,                                 // Resolution in megapixels (0.3 for 640x480, 1.3 for 1280x720, etc), set to 0 if param 4/5 are used
-                                 1920,                              // Resolution horizontal in pixels
-                                 1080);                             // Resolution horizontal in pixels
     }
 }
 

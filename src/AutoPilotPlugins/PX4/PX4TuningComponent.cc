@@ -14,7 +14,7 @@
 
 PX4TuningComponent::PX4TuningComponent(Vehicle* vehicle, AutoPilotPlugin* autopilot, QObject* parent)
     : VehicleComponent(vehicle, autopilot, parent)
-    , _name("Tuning")
+    , _name(tr("Tuning"))
 {
 }
 
@@ -83,18 +83,4 @@ QUrl PX4TuningComponent::setupSource(void) const
 QUrl PX4TuningComponent::summaryQmlSource(void) const
 {
     return QUrl();
-}
-
-QString PX4TuningComponent::prerequisiteSetup(void) const
-{
-    PX4AutoPilotPlugin* plugin = dynamic_cast<PX4AutoPilotPlugin*>(_autopilot);
-    if (plugin) {
-        if (!plugin->airframeComponent()->setupComplete()) {
-            return plugin->airframeComponent()->name();
-        }
-    } else {
-        qWarning() << "Internal error: plugin cast failed";
-    }
-
-    return QString();
 }

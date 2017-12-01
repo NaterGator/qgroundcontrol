@@ -36,7 +36,6 @@ QMap<QString, Joystick*> JoystickSDL::discover(MultiVehicleManager* _multiVehicl
     for (int i=0; i<SDL_NumJoysticks(); i++) {
         QString name = SDL_JoystickNameForIndex(i);
 
-        // TODO use GUID instead of name in case of two joysticks with same name
         if (!ret.contains(name)) {
             int axisCount, buttonCount, hatCount;
             bool isGameController;
@@ -65,11 +64,23 @@ QMap<QString, Joystick*> JoystickSDL::discover(MultiVehicleManager* _multiVehicl
             }
 
             qCDebug(JoystickLog) << "\t" << name << "axes:" << axisCount << "buttons:" << buttonCount << "hats:" << hatCount << "isGC:" << isGameController;
+
+            // Check for joysticks with duplicate names and differentiate the keys when necessary.
+            // This is required when using an Xbox 360 wireless receiver that always identifies as
+            // 4 individual joysticks, regardless of how many joysticks are actually connected to the
+            // receiver. Using GUID does not help, all of these devices present the same GUID.
+            QString originalName = name;
+            uint8_t duplicateIdx = 1;
+            while (newRet[name]) {
+                name = QString("%1 %2").arg(originalName).arg(duplicateIdx++);
+            }
+
             newRet[name] = new JoystickSDL(name, qMax(0,axisCount), qMax(0,buttonCount), qMax(0,hatCount), i, isGameController, _multiVehicleManager);
         } else {
             newRet[name] = ret[name];
-            if (newRet[name]->index() != i) {
-                newRet[name]->setIndex(i); // This joystick index has been remapped by SDL
+            JoystickSDL *j = (JoystickSDL*)newRet[name];
+            if (j->index() != i) {
+                j->setIndex(i); // This joystick index has been remapped by SDL
             }
             // Anything left in ret after we exit the loop has been removed (unplugged) and needs to be cleaned up.
             // We will handle that in JoystickManager in case the removed joystick was in use.
@@ -134,7 +145,10 @@ void JoystickSDL::_close(void) {
 
         if (SDL_JoystickInstanceID(sdlJoystick) != -1) {
             qCDebug(JoystickLog) << "\tID:" << SDL_JoystickInstanceID(sdlJoystick);
-            SDL_JoystickClose(sdlJoystick);
+            // This segfaults so often, and I've spent so much time trying to find the cause and fix it
+            // I think this might be an SDL bug
+            // We are much more stable just commenting this out
+            //SDL_JoystickClose(sdlJoystick);
         }
     }
 

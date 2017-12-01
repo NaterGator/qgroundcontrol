@@ -21,8 +21,9 @@
 
 #include <QQmlEngine>
 
-MissionCommandTree::MissionCommandTree(QGCApplication* app, bool unitTest)
-    : QGCTool(app)
+MissionCommandTree::MissionCommandTree(QGCApplication* app, QGCToolbox* toolbox, bool unitTest)
+    : QGCTool(app, toolbox)
+    , _allCommandsCategory(tr("All commands"))
     , _settingsManager(NULL)
     , _unitTest(unitTest)
 {
@@ -37,12 +38,12 @@ void MissionCommandTree::setToolbox(QGCToolbox* toolbox)
 #ifdef UNITTEST_BUILD
     if (_unitTest) {
         // Load unit testing tree
-        _staticCommandTree[MAV_AUTOPILOT_GENERIC][MAV_TYPE_GENERIC] =           new MissionCommandList(":/json/unittest/MavCmdInfoCommon.json", true, this);
-        _staticCommandTree[MAV_AUTOPILOT_GENERIC][MAV_TYPE_FIXED_WING] =        new MissionCommandList(":/json/unittest/MavCmdInfoFixedWing.json", false, this);
-        _staticCommandTree[MAV_AUTOPILOT_GENERIC][MAV_TYPE_QUADROTOR] =         new MissionCommandList(":/json/unittest/MavCmdInfoMultiRotor.json", false, this);
-        _staticCommandTree[MAV_AUTOPILOT_GENERIC][MAV_TYPE_VTOL_QUADROTOR] =    new MissionCommandList(":/json/unittest/MavCmdInfoVTOL.json", false, this);
-        _staticCommandTree[MAV_AUTOPILOT_GENERIC][MAV_TYPE_SUBMARINE] =         new MissionCommandList(":/json/unittest/MavCmdInfoSub.json", false, this);
-        _staticCommandTree[MAV_AUTOPILOT_GENERIC][MAV_TYPE_GROUND_ROVER] =      new MissionCommandList(":/json/unittest/MavCmdInfoRover.json", false, this);
+        _staticCommandTree[MAV_AUTOPILOT_GENERIC][MAV_TYPE_GENERIC] =           new MissionCommandList(":/unittest/MavCmdInfoCommon.json", true, this);
+        _staticCommandTree[MAV_AUTOPILOT_GENERIC][MAV_TYPE_FIXED_WING] =        new MissionCommandList(":/unittest/MavCmdInfoFixedWing.json", false, this);
+        _staticCommandTree[MAV_AUTOPILOT_GENERIC][MAV_TYPE_QUADROTOR] =         new MissionCommandList(":/unittest/MavCmdInfoMultiRotor.json", false, this);
+        _staticCommandTree[MAV_AUTOPILOT_GENERIC][MAV_TYPE_VTOL_QUADROTOR] =    new MissionCommandList(":/unittest/MavCmdInfoVTOL.json", false, this);
+        _staticCommandTree[MAV_AUTOPILOT_GENERIC][MAV_TYPE_SUBMARINE] =         new MissionCommandList(":/unittest/MavCmdInfoSub.json", false, this);
+        _staticCommandTree[MAV_AUTOPILOT_GENERIC][MAV_TYPE_GROUND_ROVER] =      new MissionCommandList(":/unittest/MavCmdInfoRover.json", false, this);
     } else {
 #endif
         // Load all levels of hierarchy
@@ -168,6 +169,7 @@ void MissionCommandTree::_buildAvailableCommands(Vehicle* vehicle)
             _availableCategories[baseFirmwareType][baseVehicleType].append(newCategory);
         }
     }
+    _availableCategories[baseFirmwareType][baseVehicleType].append(_allCommandsCategory);
 }
 
 QStringList MissionCommandTree::_availableCategoriesForVehicle(Vehicle* vehicle)
@@ -238,7 +240,7 @@ QVariantList MissionCommandTree::getCommandsForCategory(Vehicle* vehicle, const 
     QMap<MAV_CMD, MissionCommandUIInfo*> commandMap = _availableCommands[baseFirmwareType][baseVehicleType];
     foreach (MAV_CMD command, commandMap.keys()) {
         MissionCommandUIInfo* uiInfo = commandMap[command];
-        if (uiInfo->category() == category) {
+        if (uiInfo->category() == category || category == _allCommandsCategory) {
             list.append(QVariant::fromValue(uiInfo));
         }
     }

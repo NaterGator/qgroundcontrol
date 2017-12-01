@@ -10,7 +10,7 @@
 
 #include "QGCUASFileView.h"
 #include "FileManager.h"
-#include "QGCFileDialog.h"
+#include "QGCQFileDialog.h"
 #include "UAS.h"
 
 #include <QFileDialog>
@@ -54,10 +54,10 @@ void QGCUASFileView::_downloadFile(void)
     
     _ui.statusText->clear();
     
-    QString downloadToHere = QGCFileDialog::getExistingDirectory(this,
-                                                                 "Download Directory",
+    QString downloadToHere = QGCQFileDialog::getExistingDirectory(this,
+                                                                 tr("Download Directory"),
                                                                  QDir::homePath(),
-                                                                 QGCFileDialog::ShowDirsOnly | QGCFileDialog::DontResolveSymlinks);
+                                                                 QGCQFileDialog::ShowDirsOnly | QGCQFileDialog::DontResolveSymlinks);
     
     // And now download to this location
     
@@ -81,7 +81,7 @@ void QGCUASFileView::_downloadFile(void)
         _setAllButtonsEnabled(false);
         _currentCommand = commandDownload;
         
-        _ui.statusText->setText(QString("Downloading: %1").arg(downloadFilename));
+        _ui.statusText->setText(tr("Downloading: %1").arg(downloadFilename));
                                 
         _manager->streamPath(path, QDir(downloadToHere));
     }
@@ -111,9 +111,9 @@ void QGCUASFileView::_uploadFile(void)
         item = item->parent();
     } while (item);
 
-    QString uploadFromHere = QGCFileDialog::getOpenFileName(this, "Upload File", QDir::homePath());
+    QString uploadFromHere = QGCQFileDialog::getOpenFileName(this, tr("Upload File"), QDir::homePath());
 
-    _ui.statusText->setText(QString("Uploading: %1").arg(uploadFromHere));
+    _ui.statusText->setText(tr("Uploading: %1").arg(uploadFromHere));
                             
     qDebug() << "Upload: " << uploadFromHere << "to path" << path;
     
@@ -136,7 +136,7 @@ void QGCUASFileView::_commandError(const QString& msg)
 {
     _setAllButtonsEnabled(true);
     _currentCommand = commandNone;
-    _ui.statusText->setText(QString("Error: %1").arg(msg));
+    _ui.statusText->setText(tr("Error: %1").arg(msg));
 }
 
 /// @brief Refreshes the directory list tree.
@@ -198,7 +198,7 @@ void QGCUASFileView::_commandComplete(void)
         _currentCommand = commandNone;
         _setAllButtonsEnabled(true);
         statusText = "Download complete";
-    } else if (_currentCommand == commandDownload) {
+    } else if (_currentCommand == commandUpload) {
         _currentCommand = commandNone;
         _setAllButtonsEnabled(true);
         statusText = "Upload complete";

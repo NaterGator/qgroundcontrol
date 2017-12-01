@@ -17,7 +17,7 @@ const char* APMAirframeComponent::_newFrameParam = "FRAME_CLASS";
 APMAirframeComponent::APMAirframeComponent(Vehicle* vehicle, AutoPilotPlugin* autopilot, QObject* parent)
     : VehicleComponent(vehicle, autopilot, parent)
     , _requiresFrameSetup(false)
-    , _name("Airframe")
+    , _name(tr("Airframe"))
 {
     if (qobject_cast<ArduCopterFirmwarePlugin*>(_vehicle->firmwarePlugin()) != NULL) {
         ParameterManager* paramMgr = _vehicle->parameterManager();
@@ -97,9 +97,4 @@ QUrl APMAirframeComponent::summaryQmlSource(void) const
     } else {
         return QUrl();
     }
-}
-
-QString APMAirframeComponent::prerequisiteSetup(void) const
-{
-    return QString();
 }

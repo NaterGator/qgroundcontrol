@@ -21,19 +21,14 @@ public:
 
     const ComplexMissionItem& operator=(const ComplexMissionItem& other);
 
-    Q_PROPERTY(QString  mapVisualQML        READ mapVisualQML       CONSTANT)
-    Q_PROPERTY(int      lastSequenceNumber  READ lastSequenceNumber NOTIFY lastSequenceNumberChanged)
     Q_PROPERTY(double   complexDistance     READ complexDistance    NOTIFY complexDistanceChanged)
 
     /// @return The distance covered the complex mission item in meters.
+    /// Signals complexDistanceChanged
     virtual double complexDistance(void) const = 0;
 
-    /// @return The last sequence number used by this item. Takes into account child items of the complex item
-    virtual int lastSequenceNumber(void) const = 0;
-
-    /// Returns the mission items associated with the complex item. Caller is responsible for freeing. Calling
-    /// delete on returned QmlObjectListModel will free all memory including internal items.
-    virtual QmlObjectListModel* getMissionItems(void) const = 0;
+    /// @return Amount of additional time delay in seconds needed to fly the complex item
+    virtual double additionalTimeDelay(void) const { return 0; }
 
     /// Load the complex mission item from Json
     ///     @param complexObject Complex mission item json object
@@ -45,20 +40,16 @@ public:
     /// Get the point of complex mission item furthest away from a coordinate
     ///     @param other QGeoCoordinate to which distance is calculated
     /// @return the greatest distance from any point of the complex item to some coordinate
+    /// Signals greatestDistanceToChanged
     virtual double greatestDistanceTo(const QGeoCoordinate &other) const = 0;
-
-    /// Informs the complex item of the cruise speed it will fly at
-    virtual void setCruiseSpeed(double cruiseSpeed) = 0;
 
     /// This mission item attribute specifies the type of the complex item.
     static const char* jsonComplexItemTypeKey;
 
-    /// @return The QML resource file which contains the control which visualizes the item on the map.
-    virtual QString mapVisualQML(void) const = 0;
-
 signals:
-    void lastSequenceNumberChanged  (int lastSequenceNumber);
     void complexDistanceChanged     (double complexDistance);
+    void greatestDistanceToChanged  (void);
+    void additionalTimeDelayChanged (double additionalTimeDelay);
 };
 
 #endif

@@ -77,7 +77,10 @@ public:
     int             doJumpId        (void) const { return _doJumpId; }
 
     /// @return Flight speed change value if this item supports it. If not it returns NaN.
-    double          flightSpeed     (void) const;
+    double specifiedFlightSpeed(void) const;
+
+    /// @return Flight gimbal yaw change value if this item supports it. If not it returns NaN.
+    double specifiedGimbalYaw(void) const;
 
     void setCommand         (MAV_CMD command);
     void setSequenceNumber  (int sequenceNumber);
@@ -100,15 +103,18 @@ public:
     bool relativeAltitude(void) const { return frame() == MAV_FRAME_GLOBAL_RELATIVE_ALT; }
 
 signals:
-    void isCurrentItemChanged   (bool isCurrentItem);
-    void sequenceNumberChanged  (int sequenceNumber);
-    void flightSpeedChanged     (double flightSpeed);
+    void isCurrentItemChanged       (bool isCurrentItem);
+    void sequenceNumberChanged      (int sequenceNumber);
+    void specifiedFlightSpeedChanged(double flightSpeed);
+    void specifiedGimbalYawChanged  (double gimbalYaw);
 
 private slots:
     void _param2Changed         (QVariant value);
-    
+    void _param3Changed         (QVariant value);
+
 private:
     bool _convertJsonV1ToV2(const QJsonObject& json, QJsonObject& v2Json, QString& errorString);
+    bool _convertJsonV2ToV3(QJsonObject& json, QString& errorString);
 
     int     _sequenceNumber;
     int     _doJumpId;
@@ -129,9 +135,11 @@ private:
     static const char*  _jsonFrameKey;
     static const char*  _jsonCommandKey;
     static const char*  _jsonAutoContinueKey;
-    static const char*  _jsonCoordinateKey;
     static const char*  _jsonParamsKey;
     static const char*  _jsonDoJumpIdKey;
+
+    // Deprecated V2 format keys
+    static const char*  _jsonCoordinateKey;
 
     // Deprecated V1 format keys
     static const char*  _jsonParam1Key;

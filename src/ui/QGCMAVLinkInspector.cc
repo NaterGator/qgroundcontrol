@@ -53,7 +53,7 @@ QGCMAVLinkInspector::QGCMAVLinkInspector(const QString& title, QAction* action, 
 
 void QGCMAVLinkInspector::_vehicleAdded(Vehicle* vehicle)
 {
-    ui->systemComboBox->addItem(QString("Vehicle %1").arg(vehicle->id()), vehicle->id());
+    ui->systemComboBox->addItem(tr("Vehicle %1").arg(vehicle->id()), vehicle->id());
 
     // Add a tree for a new UAS
     addUAStoTree(vehicle->id());
@@ -178,6 +178,11 @@ void QGCMAVLinkInspector::refreshView()
     {
         mavlink_message_t* msg = ite.value();
         const mavlink_message_info_t* msgInfo = mavlink_get_message_info(msg);
+
+        if (!msgInfo) {
+            qWarning() << QStringLiteral("QGCMAVLinkInspector::refreshView NULL msgInfo msgid(%1)").arg(msg->msgid);
+            continue;
+        }
 
         // Ignore NULL values
         if (msg->msgid == 0xFF) continue;

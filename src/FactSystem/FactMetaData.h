@@ -39,16 +39,20 @@ public:
         valueTypeFloat,
         valueTypeDouble,
         valueTypeString,
-        valueTypeBool
+        valueTypeBool,
+        valueTypeElapsedTimeInSeconds,  // Internally stored as double, valueString displays as HH:MM:SS
+        valueTypeCustom,                // Internally stored as a QByteArray
     } ValueType_t;
 
     typedef QVariant (*Translator)(const QVariant& from);
     
     FactMetaData(QObject* parent = NULL);
     FactMetaData(ValueType_t type, QObject* parent = NULL);
+    FactMetaData(ValueType_t type, const QString name, QObject* parent = NULL);
     FactMetaData(const FactMetaData& other, QObject* parent = NULL);
 
     static QMap<QString, FactMetaData*> createMapFromJsonFile(const QString& jsonFilename, QObject* metaDataParent);
+    static QMap<QString, FactMetaData*> createMapFromJsonArray(const QJsonArray jsonArray, QObject* metaDataParent);
 
     static FactMetaData* createFromJsonObject(const QJsonObject& json, QObject* metaDataParent);
 
@@ -83,10 +87,10 @@ public:
     QString         group                   (void) const { return _group; }
     QString         longDescription         (void) const { return _longDescription;}
     QVariant        rawMax                  (void) const { return _rawMax; }
-    QVariant        cookedMax               (void) const { return _rawTranslator(_rawMax); }
+    QVariant        cookedMax               (void) const;
     bool            maxIsDefaultForType     (void) const { return _maxIsDefaultForType; }
     QVariant        rawMin                  (void) const { return _rawMin; }
-    QVariant        cookedMin               (void) const { return _rawTranslator(_rawMin); }
+    QVariant        cookedMin               (void) const;
     bool            minIsDefaultForType     (void) const { return _minIsDefaultForType; }
     QString         name                    (void) const { return _name; }
     QString         shortDescription        (void) const { return _shortDescription; }
@@ -94,6 +98,8 @@ public:
     QString         rawUnits                (void) const { return _rawUnits; }
     QString         cookedUnits             (void) const { return _cookedUnits; }
     bool            rebootRequired          (void) const { return _rebootRequired; }
+    bool            hasControl              (void) const { return _hasControl; }
+    bool            readOnly                (void) const { return _readOnly; }
 
     /// Amount to increment value when used in controls such as spin button or slider with detents.
     /// NaN for no increment available.
@@ -121,6 +127,8 @@ public:
     void setRawUnits        (const QString& rawUnits);
     void setRebootRequired  (bool rebootRequired)               { _rebootRequired = rebootRequired; }
     void setIncrement       (double increment)                  { _increment = increment; }
+    void setHasControl      (bool bValue)                       { _hasControl = bValue; }
+    void setReadOnly        (bool bValue)                       { _readOnly = bValue; }
 
     void setTranslators(Translator rawTranslator, Translator cookedTranslator);
 
@@ -137,6 +145,12 @@ public:
 
     /// Same as convertAndValidateRaw except for cookedValue input
     bool convertAndValidateCooked(const QVariant& cookedValue, bool convertOnly, QVariant& typedValue, QString& errorString);
+
+    /// Converts the specified cooked value and clamps it (max/min)
+    ///     @param cookedValue Value to convert, can be string
+    ///     @param typeValue Converted value, correctly typed and clamped
+    /// @returns false: Convertion failed
+    bool clampValue(const QVariant& cookedValue, QVariant& typedValue);
 
     static const int defaultDecimalPlaces = 3;  ///< Default value for decimal places if not specified/known
     static const int unknownDecimalPlaces = -1; ///< Number of decimal places to specify is not known
@@ -155,6 +169,8 @@ private:
     static QVariant _radiansToDegrees(const QVariant& radians);
     static QVariant _centiDegreesToDegrees(const QVariant& centiDegrees);
     static QVariant _degreesToCentiDegrees(const QVariant& degrees);
+    static QVariant _userGimbalDegreesToMavlinkGimbalDegrees(const QVariant& userGimbalDegrees);
+    static QVariant _mavlinkGimbalDegreesToUserGimbalDegrees(const QVariant& mavlinkGimbalDegrees);
     static QVariant _metersToFeet(const QVariant& meters);
     static QVariant _feetToMeters(const QVariant& feet);
     static QVariant _squareMetersToSquareKilometers(const QVariant& squareMeters);
@@ -175,6 +191,8 @@ private:
     static QVariant _knotsToMetersPerSecond(const QVariant& knots);
     static QVariant _percentToNorm(const QVariant& percent);
     static QVariant _normToPercent(const QVariant& normalized);
+    static QVariant _centimetersToInches(const QVariant& centimeters);
+    static QVariant _inchesToCentimeters(const QVariant& inches);
 
     struct AppSettingsTranslation_s {
         const char* rawUnits;
@@ -211,6 +229,8 @@ private:
     Translator      _cookedTranslator;
     bool            _rebootRequired;
     double          _increment;
+    bool            _hasControl;
+    bool            _readOnly;
 
     // Exact conversion constants
     static const struct UnitConsts_s {
@@ -218,6 +238,7 @@ private:
         static const qreal knotsToKPH;
         static const qreal milesToMeters;
         static const qreal feetToMeters;
+        static const qreal inchesToCentimeters;
     } constants;
 
     struct BuiltInTranslation_s {
@@ -239,8 +260,10 @@ private:
     static const char*  _longDescriptionJsonKey;
     static const char*  _unitsJsonKey;
     static const char*  _defaultValueJsonKey;
+    static const char*  _mobileDefaultValueJsonKey;
     static const char*  _minJsonKey;
     static const char*  _maxJsonKey;
+    static const char* _hasControlJsonKey;
 };
 
 #endif

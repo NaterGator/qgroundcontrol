@@ -78,8 +78,6 @@ public:
     const QString               userAgent           () { return _userAgent; }
     void                        setUserAgent        (const QString& ua) { _userAgent = ua; }
     UrlFactory::MapType         hashToType          (const QString& hash);
-    QString                     getMapBoxToken      ();
-    void                        setMapBoxToken      (const QString& token);
     quint32                     getMaxDiskCache     ();
     void                        setMaxDiskCache     (quint32 size);
     quint32                     getMaxMemCache      ();
@@ -109,6 +107,7 @@ private slots:
 
 signals:
     void updateTotals           (quint32 totaltiles, quint64 totalsize, quint32 defaulttiles, quint64 defaultsize);
+    void internetUpdated        ();
 
 private:
     void _wipeOldCaches         ();
@@ -119,7 +118,6 @@ private:
     QGCCacheWorker          _worker;
     QString                 _cachePath;
     QString                 _cacheFile;
-    QString                 _mapBoxToken;
     UrlFactory*             _urlFactory;
     QString                 _userAgent;
     quint32                 _maxDiskCache;

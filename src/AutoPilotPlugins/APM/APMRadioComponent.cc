@@ -66,13 +66,13 @@ bool APMRadioComponent::setupComplete(void) const
     // Next check RC#_MIN/MAX/TRIM all at defaults
     foreach (const QString& mapParam, _mapParams) {
         int channel = _vehicle->parameterManager()->getParameter(-1, mapParam)->rawValue().toInt();
-        if (_vehicle->parameterManager()->getParameter(-1, QString("RC%1_MIN").arg(channel))->rawValue().toInt() != 1100) {
+        if (_vehicle->parameterManager()->getParameter(-1, QStringLiteral("RC%1_MIN").arg(channel))->rawValue().toInt() != 1100) {
             return true;
         }
-        if (_vehicle->parameterManager()->getParameter(-1, QString("RC%1_MAX").arg(channel))->rawValue().toInt() != 1900) {
+        if (_vehicle->parameterManager()->getParameter(-1, QStringLiteral("RC%1_MAX").arg(channel))->rawValue().toInt() != 1900) {
             return true;
         }
-        if (_vehicle->parameterManager()->getParameter(-1, QString("RC%1_TRIM").arg(channel))->rawValue().toInt() != 1500) {
+        if (_vehicle->parameterManager()->getParameter(-1, QStringLiteral("RC%1_TRIM").arg(channel))->rawValue().toInt() != 1500) {
             return true;
         }
     }
@@ -96,17 +96,6 @@ QUrl APMRadioComponent::summaryQmlSource(void) const
     return QUrl::fromUserInput(QStringLiteral("qrc:/qml/APMRadioComponentSummary.qml"));
 }
 
-QString APMRadioComponent::prerequisiteSetup(void) const
-{
-    APMAutoPilotPlugin* plugin = dynamic_cast<APMAutoPilotPlugin*>(_autopilot);
-
-    if (!plugin->airframeComponent()->setupComplete()) {
-        return plugin->airframeComponent()->name();
-    }
-    
-    return QString();
-}
-
 void APMRadioComponent::_connectSetupTriggers(void)
 {
     // Disconnect previous triggers
@@ -119,15 +108,15 @@ void APMRadioComponent::_connectSetupTriggers(void)
     foreach (const QString& mapParam, _mapParams) {
         int channel = _vehicle->parameterManager()->getParameter(FactSystem::defaultComponentId, mapParam)->rawValue().toInt();
 
-        Fact* fact = _vehicle->parameterManager()->getParameter(-1, QString("RC%1_MIN").arg(channel));
+        Fact* fact = _vehicle->parameterManager()->getParameter(-1, QStringLiteral("RC%1_MIN").arg(channel));
         _triggerFacts << fact;
         connect(fact, &Fact::valueChanged, this, &APMRadioComponent::_triggerChanged);
 
-        fact = _vehicle->parameterManager()->getParameter(-1, QString("RC%1_MAX").arg(channel));
+        fact = _vehicle->parameterManager()->getParameter(-1, QStringLiteral("RC%1_MAX").arg(channel));
         _triggerFacts << fact;
         connect(fact, &Fact::valueChanged, this, &APMRadioComponent::_triggerChanged);
 
-        fact = _vehicle->parameterManager()->getParameter(-1, QString("RC%1_TRIM").arg(channel));
+        fact = _vehicle->parameterManager()->getParameter(-1, QStringLiteral("RC%1_TRIM").arg(channel));
         _triggerFacts << fact;
         connect(fact, &Fact::valueChanged, this, &APMRadioComponent::_triggerChanged);
     }

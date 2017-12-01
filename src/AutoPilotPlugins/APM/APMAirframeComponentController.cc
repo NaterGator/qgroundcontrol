@@ -40,14 +40,17 @@ APMAirframeComponentController::APMAirframeComponentController(void) :
     }
     _fillAirFrames();
 
-    Fact* frame;
+    Fact* frame = NULL;
     if (parameterExists(FactSystem::defaultComponentId, _oldFrameParam)) {
         frame = getParameterFact(FactSystem::defaultComponentId, _oldFrameParam);
-    } else {
+    } else if (parameterExists(FactSystem::defaultComponentId, _newFrameParam)){
         frame = getParameterFact(FactSystem::defaultComponentId, _newFrameParam);
     }
-    connect(frame, &Fact::rawValueChanged, this, &APMAirframeComponentController::_factFrameChanged);
-    _factFrameChanged(frame->rawValue());
+
+    if (frame) {
+        connect(frame, &Fact::rawValueChanged, this, &APMAirframeComponentController::_factFrameChanged);
+        _factFrameChanged(frame->rawValue());
+    }
 }
 
 APMAirframeComponentController::~APMAirframeComponentController()
@@ -234,7 +237,7 @@ void APMAirframeComponentController::_githubJsonDownloadFinished(QString remoteF
     QGCFileDownload* downloader = new QGCFileDownload(this);
     connect(downloader, &QGCFileDownload::downloadFinished, this, &APMAirframeComponentController::_paramFileDownloadFinished);
     connect(downloader, &QGCFileDownload::error, this, &APMAirframeComponentController::_paramFileDownloadError);
-    downloader->download(json["download_url"].toString());
+    downloader->download(json[QLatin1Literal("download_url")].toString());
 }
 
 void APMAirframeComponentController::_githubJsonDownloadError(QString errorMsg)

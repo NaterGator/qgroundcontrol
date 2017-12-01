@@ -31,7 +31,7 @@ QString APMSafetyComponent::description(void) const
 {
     switch (_vehicle->vehicleType()) {
         case MAV_TYPE_SUBMARINE:
-            return tr("Safety Setup is used to setup failsafe actions, geofence limits, leak detection, and arming checks.");
+            return tr("Safety Setup is used to setup failsafe actions, leak detection, and arming checks.");
             break;
         case MAV_TYPE_GROUND_ROVER:
         case MAV_TYPE_FIXED_WING:
@@ -126,16 +126,4 @@ QUrl APMSafetyComponent::summaryQmlSource(void) const
     }
 
     return QUrl::fromUserInput(qmlFile);
-}
-
-QString APMSafetyComponent::prerequisiteSetup(void) const
-{
-    APMAutoPilotPlugin* plugin = dynamic_cast<APMAutoPilotPlugin*>(_autopilot);
-    Q_ASSERT(plugin);
-
-    if (!plugin->airframeComponent()->setupComplete()) {
-        return plugin->airframeComponent()->name();
-    }
-
-    return QString();
 }

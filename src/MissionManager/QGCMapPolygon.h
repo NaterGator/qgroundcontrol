@@ -15,45 +15,55 @@
 #include <QVariantList>
 #include <QPolygon>
 
-/// The QGCMapPolygon class provides a polygon which can be displayed on a map using a MapPolygon control.
-/// It works in conjunction with the QGCMapPolygonControls control which provides the UI for drawing and
-/// editing map polygons.
+#include "QmlObjectListModel.h"
+
+/// The QGCMapPolygon class provides a polygon which can be displayed on a map using a map visuals control.
+/// It maintains a representation of the polygon on QVariantList and QmlObjectListModel format.
 class QGCMapPolygon : public QObject
 {
     Q_OBJECT
 
 public:
     QGCMapPolygon(QObject* parent = NULL);
+    QGCMapPolygon(const QGCMapPolygon& other, QObject* parent = NULL);
 
     const QGCMapPolygon& operator=(const QGCMapPolygon& other);
 
-    QGeoCoordinate operator[](int index) const { return _polygonPath[index].value<QGeoCoordinate>(); }
+    Q_PROPERTY(int                  count       READ count                                  NOTIFY countChanged)
+    Q_PROPERTY(QVariantList         path        READ path                                   NOTIFY pathChanged)
+    Q_PROPERTY(QmlObjectListModel*  pathModel   READ qmlPathModel                           CONSTANT)
+    Q_PROPERTY(bool                 dirty       READ dirty          WRITE setDirty          NOTIFY dirtyChanged)
+    Q_PROPERTY(QGeoCoordinate       center      READ center         WRITE setCenter         NOTIFY centerChanged)
+    Q_PROPERTY(bool                 centerDrag  READ centerDrag     WRITE setCenterDrag     NOTIFY centerDragChanged)
+    Q_PROPERTY(bool                 interactive READ interactive    WRITE setInteractive    NOTIFY interactiveChanged)
 
-    /// The polygon path to be bound to the MapPolygon.path property
-    Q_PROPERTY(QVariantList path READ path WRITE setPath NOTIFY pathChanged)
-
-    /// true: Polygon has changed since last time dirty was false
-    Q_PROPERTY(bool dirty READ dirty WRITE setDirty NOTIFY dirtyChanged)
-
-    /// Remove all points from polygon
     Q_INVOKABLE void clear(void);
+    Q_INVOKABLE void appendVertex(const QGeoCoordinate& coordinate);
+    Q_INVOKABLE void removeVertex(int vertexIndex);
 
     /// Adjust the value for the specified coordinate
     ///     @param vertexIndex Polygon point index to modify (0-based)
     ///     @param coordinate New coordinate for point
-    Q_INVOKABLE void adjustCoordinate(int vertexIndex, const QGeoCoordinate coordinate);
+    Q_INVOKABLE void adjustVertex(int vertexIndex, const QGeoCoordinate coordinate);
 
-    /// Returns the center point coordinate for the polygon
-    Q_INVOKABLE QGeoCoordinate center(void) const;
+    /// Splits the segment comprised of vertextIndex -> vertexIndex + 1
+    Q_INVOKABLE void splitPolygonSegment(int vertexIndex);
 
     /// Returns true if the specified coordinate is within the polygon
     Q_INVOKABLE bool containsCoordinate(const QGeoCoordinate& coordinate) const;
 
-    /// Returns the number of points in the polygon
-    Q_INVOKABLE int count(void) const { return _polygonPath.count(); }
+    /// Offsets the current polygon edges by the specified distance in meters
+    Q_INVOKABLE void offset(double distance);
+
+    /// Loads a polygon from a KML file
+    /// @return true: success
+    Q_INVOKABLE bool loadKMLFile(const QString& kmlFile);
 
     /// Returns the path in a list of QGeoCoordinate's format
     QList<QGeoCoordinate> coordinateList(void) const;
+
+    /// Returns the QGeoCoordinate for the vertex specified
+    QGeoCoordinate vertexCoordinate(int vertex) const;
 
     /// Saves the polygon to the json object.
     ///     @param json Json object to save to
@@ -66,28 +76,57 @@ public:
     /// @return true: success, false: failure (errorString set)
     bool loadFromJson(const QJsonObject& json, bool required, QString& errorString);
 
+    /// Convert polygon to NED and return (D is ignored)
+    QList<QPointF> nedPolygon(void);
+
     // Property methods
 
-    bool dirty(void) const { return _dirty; }
-    void setDirty(bool dirty);
+    int             count       (void) const { return _polygonPath.count(); }
+    bool            dirty       (void) const { return _dirty; }
+    void            setDirty    (bool dirty);
+    QGeoCoordinate  center      (void) const { return _center; }
+    bool            centerDrag  (void) const { return _centerDrag; }
+    bool            interactive (void) const { return _interactive; }
 
-    QVariantList path(void) const { return _polygonPath; }
-    void setPath(const QList<QGeoCoordinate>& path);
-    void setPath(const QVariantList& path);
+    QVariantList        path        (void) const { return _polygonPath; }
+    QmlObjectListModel* qmlPathModel(void) { return &_polygonModel; }
+    QmlObjectListModel& pathModel   (void) { return _polygonModel; }
+
+    void setPath        (const QList<QGeoCoordinate>& path);
+    void setPath        (const QVariantList& path);
+    void setCenter      (QGeoCoordinate newCenter);
+    void setCenterDrag  (bool centerDrag);
+    void setInteractive (bool interactive);
+
+    static const char* jsonPolygonKey;
 
 signals:
-    void pathChanged(void);
-    void dirtyChanged(bool dirty);
+    void countChanged       (int count);
+    void pathChanged        (void);
+    void dirtyChanged       (bool dirty);
+    void cleared            (void);
+    void centerChanged      (QGeoCoordinate center);
+    void centerDragChanged  (bool centerDrag);
+    void interactiveChanged (bool interactive);
+
+private slots:
+    void _polygonModelCountChanged(int count);
+    void _polygonModelDirtyChanged(bool dirty);
+    void _updateCenter(void);
 
 private:
+    void _init(void);
     QPolygonF _toPolygonF(void) const;
     QGeoCoordinate _coordFromPointF(const QPointF& point) const;
     QPointF _pointFFromCoord(const QGeoCoordinate& coordinate) const;
 
-    QVariantList    _polygonPath;
-    bool            _dirty;
-
-    static const char* _jsonPolygonKey;
+    QVariantList        _polygonPath;
+    QmlObjectListModel  _polygonModel;
+    bool                _dirty;
+    QGeoCoordinate      _center;
+    bool                _centerDrag;
+    bool                _ignoreCenterUpdates;
+    bool                _interactive;
 };
 
 #endif

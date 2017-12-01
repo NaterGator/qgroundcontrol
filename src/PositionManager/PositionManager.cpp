@@ -8,22 +8,15 @@
  ****************************************************************************/
 
 #include "PositionManager.h"
+#include "QGCApplication.h"
+#include "QGCCorePlugin.h"
 
-QGCPositionManager::QGCPositionManager(QGCApplication* app) :
-    QGCTool(app),
-    _updateInterval(0),
-    _currentSource(nullptr)
+QGCPositionManager::QGCPositionManager(QGCApplication* app, QGCToolbox* toolbox)
+    : QGCTool(app, toolbox)
+    , _updateInterval(0)
+    , _currentSource(nullptr)
 {
-    _defaultSource = QGeoPositionInfoSource::createDefaultSource(this);
-    _simulatedSource = new SimulatedPosition();
 
-    // Enable this to get a simulated target on desktop
-
-    // if (_defaultSource == nullptr) {
-    //     _defaultSource = _simulatedSource;
-    // }
-
-    setPositionSource(QGCPositionSource::GPS);
 }
 
 QGCPositionManager::~QGCPositionManager()
@@ -31,12 +24,29 @@ QGCPositionManager::~QGCPositionManager()
     delete(_simulatedSource);
 }
 
-void QGCPositionManager::positionUpdated(const QGeoPositionInfo &update)
+void QGCPositionManager::setToolbox(QGCToolbox *toolbox)
 {
+   QGCTool::setToolbox(toolbox);
+   //-- First see if plugin provides a position source
+   _defaultSource = toolbox->corePlugin()->createPositionSource(this);
+   if(!_defaultSource) {
+       //-- Otherwise, create a default one
+       _defaultSource = QGeoPositionInfoSource::createDefaultSource(this);
+       qDebug() << _defaultSource;
+   }
+   _simulatedSource = new SimulatedPosition();
 
-    QGeoCoordinate position(update.coordinate().latitude(), update.coordinate().longitude());
+   // Enable this to get a simulated target on desktop
+   // if (_defaultSource == nullptr) {
+   //     _defaultSource = _simulatedSource;
+   // }
 
-    emit lastPositionUpdated(update.isValid(), QVariant::fromValue(position));
+   setPositionSource(QGCPositionSource::GPS);
+}
+
+void QGCPositionManager::_positionUpdated(const QGeoPositionInfo &update)
+{
+    emit lastPositionUpdated(update.isValid(), QVariant::fromValue(update.coordinate()));
     emit positionInfoUpdated(update);
 }
 
@@ -49,7 +59,12 @@ void QGCPositionManager::setPositionSource(QGCPositionManager::QGCPositionSource
 {
     if (_currentSource != nullptr) {
         _currentSource->stopUpdates();
-        disconnect(_currentSource, SIGNAL(positionUpdated(QGeoPositionInfo)), this, SLOT(positionUpdated(QGeoPositionInfo)));
+        disconnect(_currentSource);
+    }
+
+    if (qgcApp()->runningUnitTests()) {
+        // Units test on travis fail due to lack of position source
+        return;
     }
 
     switch(source) {
@@ -68,9 +83,13 @@ void QGCPositionManager::setPositionSource(QGCPositionManager::QGCPositionSource
         _updateInterval = _currentSource->minimumUpdateInterval();
         _currentSource->setPreferredPositioningMethods(QGeoPositionInfoSource::SatellitePositioningMethods);
         _currentSource->setUpdateInterval(_updateInterval);
+        connect(_currentSource, &QGeoPositionInfoSource::positionUpdated,       this, &QGCPositionManager::_positionUpdated);
+        connect(_currentSource, SIGNAL(error(QGeoPositionInfoSource::Error)),   this, SLOT(_error(QGeoPositionInfoSource::Error)));
         _currentSource->startUpdates();
-
-        connect(_currentSource, SIGNAL(positionUpdated(QGeoPositionInfo)), this, SLOT(positionUpdated(QGeoPositionInfo)));
     }
 }
 
+void QGCPositionManager::_error(QGeoPositionInfoSource::Error positioningError)
+{
+    qWarning() << "QGCPositionManager error" << positioningError;
+}

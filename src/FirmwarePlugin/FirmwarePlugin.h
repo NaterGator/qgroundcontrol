@@ -22,8 +22,11 @@
 
 #include <QList>
 #include <QString>
+#include <QVariantList>
 
 class Vehicle;
+class QGCCameraControl;
+class QGCCameraManager;
 
 /// This is the base class for Firmware specific plugins
 ///
@@ -44,6 +47,7 @@ public:
         PauseVehicleCapability =            1 << 2, ///< Vehicle supports pausing at current location
         GuidedModeCapability =              1 << 3, ///< Vehicle supports guided mode commands
         OrbitModeCapability =               1 << 4, ///< Vehicle supports orbit mode
+        TakeoffVehicleCapability =          1 << 5, ///< Vehicle supports guided takeoff
     } FirmwareCapabilities;
 
     /// Maps from on parameter name to another
@@ -61,7 +65,7 @@ public:
     ///     value:  remapParamNameMinorVersionRemapMap_t entry
     typedef QMap<int, remapParamNameMinorVersionRemapMap_t> remapParamNameMajorVersionMap_t;
 
-    /// @return The AutoPilotPlugin associated with this firmware plugin. Must be overriden.
+    /// @return The AutoPilotPlugin associated with this firmware plugin. Must be overridden.
     virtual AutoPilotPlugin* autopilotPlugin(Vehicle* vehicle);
 
     /// Called when Vehicle is first created to perform any firmware specific setup.
@@ -92,14 +96,26 @@ public:
     ///     @param[out] custom_mode Custom mode for SET_MODE mavlink message
     virtual bool setFlightMode(const QString& flightMode, uint8_t* base_mode, uint32_t* custom_mode);
 
+    /// Returns The flight mode which indicates the vehicle is paused
+    virtual QString pauseFlightMode(void) const { return QString(); }
+
+    /// Returns the flight mode for running missions
+    virtual QString missionFlightMode(void) const { return QString(); }
+
+    /// Returns the flight mode for RTL
+    virtual QString rtlFlightMode(void) const { return QString(); }
+
+    /// Returns the flight mode for Land
+    virtual QString landFlightMode(void) const { return QString(); }
+
+    /// Returns the flight mode to use when the operator wants to take back control from autonomouse flight.
+    virtual QString takeControlFlightMode(void) const { return QString(); }
+
     /// Returns whether the vehicle is in guided mode or not.
     virtual bool isGuidedMode(const Vehicle* vehicle) const;
 
     /// Set guided flight mode
     virtual void setGuidedMode(Vehicle* vehicle, bool guidedMode);
-
-    /// Returns whether the vehicle is paused or not.
-    virtual bool isPaused(const Vehicle* vehicle) const;
 
     /// Causes the vehicle to stop at current position. If guide mode is supported, vehicle will be let in guide mode.
     /// If not, vehicle will be left in Loiter.
@@ -111,9 +127,11 @@ public:
     /// Command vehicle to land at current location
     virtual void guidedModeLand(Vehicle* vehicle);
 
-    /// Command vehicle to takeoff from current location
-    ///     @param altitudeRel Relative altitude to takeoff to
-    virtual void guidedModeTakeoff(Vehicle* vehicle, double altitudeRel);
+    /// Command vehicle to takeoff from current location to a firmware specific height.
+    virtual void guidedModeTakeoff(Vehicle* vehicle, double takeoffAltRel);
+
+    /// Command the vehicle to start the mission
+    virtual void startMission(Vehicle* vehicle);
 
     /// Command vehicle to orbit given center point
     ///     @param centerCoord Center Coordinates
@@ -122,17 +140,9 @@ public:
     /// Command vehicle to move to specified location (altitude is included and relative)
     virtual void guidedModeGotoLocation(Vehicle* vehicle, const QGeoCoordinate& gotoCoord);
 
-    /// Command vehicle to change to the specified relatice altitude
-    virtual void guidedModeChangeAltitude(Vehicle* vehicle, double altitudeRel);
-
-    /// Returns the flight mode for running missions
-    virtual QString missionFlightMode(void);
-
-    /// Returns the flight mode for RTL
-    virtual QString rtlFlightMode(void);
-
-    /// Returns the flight mode to use when the operator wants to take back control from autonomouse flight.
-    virtual QString takeControlFlightMode(void);
+    /// Command vehicle to change altitude
+    ///     @param altitudeChange If > 0, go up by amount specified, if < 0, go down by amount specified
+    virtual void guidedModeChangeAltitude(Vehicle* vehicle, double altitudeChange);
 
     /// FIXME: This isn't quite correct being here. All code for Joystick suvehicleTypepport is currently firmware specific
     /// not just this. I'm going to try to change that. If not, this will need to be removed.
@@ -151,9 +161,9 @@ public:
     /// throttle.
     virtual bool supportsThrottleModeCenterZero(void);
 
-    /// Returns true if the firmware supports the use of the MAVlink "MANUAL_CONTROL" message.
-    /// By default, this returns false unless overridden in the firmware plugin.
-    virtual bool supportsManualControl(void);
+    /// Returns true if the vehicle and firmware supports the use of negative thrust
+    /// Typically supported rover.
+    virtual bool supportsNegativeThrust(void);
 
     /// Returns true if the firmware supports the use of the RC radio and requires the RC radio
     /// setup page. Returns true by default.
@@ -162,10 +172,6 @@ public:
     /// Returns true if the firmware supports the AP_JSButton library, which allows joystick buttons
     /// to be assigned via parameters in firmware. Default is false.
     virtual bool supportsJSButton(void);
-
-    /// Returns true if the firmware supports calibrating the pressure sensor so the altitude will read
-    /// zero at the current pressure. Default is false.
-    virtual bool supportsCalibratePressure(void);
 
     /// Returns true if the firmware supports calibrating motor interference offsets for the compass
     /// (CompassMot). Default is true.
@@ -232,20 +238,14 @@ public:
     /// @return true: X confiuration, false: Plus configuration
     virtual bool multiRotorXConfig(Vehicle* vehicle) { Q_UNUSED(vehicle); return false; }
 
-    /// Returns a newly created geofence manager for this vehicle.
-    virtual GeoFenceManager* newGeoFenceManager(Vehicle* vehicle) { return new GeoFenceManager(vehicle); }
-
-    /// Returns the parameter which holds the fence circle radius if supported.
-    virtual QString geoFenceRadiusParam(Vehicle* vehicle) { Q_UNUSED(vehicle); return QString(); }
-
-    /// Returns a newly created rally point manager for this vehicle.
-    virtual RallyPointManager* newRallyPointManager(Vehicle* vehicle) { return new RallyPointManager(vehicle); }
-
     /// Return the resource file which contains the set of params loaded for offline editing.
     virtual QString offlineEditingParamFile(Vehicle* vehicle) { Q_UNUSED(vehicle); return QString(); }
 
-    /// Return the resource file which contains the brand image for the vehicle.
-    virtual QString brandImage(const Vehicle* vehicle) const { Q_UNUSED(vehicle) return QString(); }
+    /// Return the resource file which contains the brand image for the vehicle for Indoor theme.
+    virtual QString brandImageIndoor(const Vehicle* vehicle) const { Q_UNUSED(vehicle) return QString(); }
+
+    /// Return the resource file which contains the brand image for the vehicle for Outdoor theme.
+    virtual QString brandImageOutdoor(const Vehicle* vehicle) const { Q_UNUSED(vehicle) return QString(); }
 
     /// Return the resource file which contains the vehicle icon used in the flight view when the view is dark (Satellite for instance)
     virtual QString vehicleImageOpaque(const Vehicle* vehicle) const;
@@ -256,8 +256,60 @@ public:
     /// Return the resource file which contains the vehicle icon used in the compass
     virtual QString vehicleImageCompass(const Vehicle* vehicle) const;
 
+    /// Allows the core plugin to override the toolbar indicators
+    /// @return A list of QUrl with the indicators (see MainToolBarIndicators.qml)
+    virtual const QVariantList& toolBarIndicators(const Vehicle* vehicle);
+
+    /// Returns a list of CameraMetaData objects for available cameras on the vehicle.
+    /// TODO: This should go into QGCCameraManager
+    virtual const QVariantList& cameraList(const Vehicle* vehicle);
+
+    /// Creates vehicle camera manager. Returns NULL if not supported.
+    virtual QGCCameraManager* createCameraManager(Vehicle *vehicle);
+
+    /// Camera control. Returns NULL if not supported.
+    virtual QGCCameraControl* createCameraControl(const mavlink_camera_information_t* info, Vehicle* vehicle, int compID, QObject* parent = NULL);
+
+    /// Returns a pointer to a dictionary of firmware-specific FactGroups
+    virtual QMap<QString, FactGroup*>* factGroups(void);
+
+    /// @true: When flying a mission the vehicle is always facing towards the next waypoint
+    virtual bool vehicleYawsToNextWaypointInMission(const Vehicle* vehicle) const;
+
+    /// Returns the data needed to do battery consumption calculations
+    ///     @param[out] mAhBattery Battery milliamp-hours rating (0 for no battery data available)
+    ///     @param[out] hoverAmps Current draw in amps during hover
+    ///     @param[out] cruiseAmps Current draw in amps during cruise
+    virtual void batteryConsumptionData(Vehicle* vehicle, int& mAhBattery, double& hoverAmps, double& cruiseAmps) const;
+
+    // Returns the parameter which control auto-disarm. Assume == 0 means no auto disarm
+    virtual QString autoDisarmParameter(Vehicle* vehicle);
+
+    /// Used to determine whether a vehicle has a gimbal.
+    ///     @param[out] rollSupported Gimbal supports roll
+    ///     @param[out] pitchSupported Gimbal supports pitch
+    ///     @param[out] yawSupported Gimbal supports yaw
+    /// @return true: vehicle has gimbal, false: gimbal support unknown
+    virtual bool hasGimbal(Vehicle* vehicle, bool& rollSupported, bool& pitchSupported, bool& yawSupported);
+
+    /// Returns true if the vehicle is a VTOL
+    virtual bool isVtol(const Vehicle* vehicle) const;
+
     // FIXME: Hack workaround for non pluginize FollowMe support
-    static const char* px4FollowMeFlightMode;
+    static const QString px4FollowMeFlightMode;
+
+protected:
+    // Arms the vehicle with validation and retries
+    // @return: true - vehicle armed, false - vehicle failed to arm
+    bool _armVehicleAndValidate(Vehicle* vehicle);
+
+    // Sets the vehicle to the specified flight mode with validation and retries
+    // @return: true - vehicle in specified flight mode, false - flight mode change failed
+    bool _setFlightModeAndValidate(Vehicle* vehicle, const QString& flightMode);
+
+private:
+    QVariantList _toolBarIndicatorList;
+    static QVariantList _cameraList;    ///< Standard QGC camera list
 };
 
 class FirmwarePluginFactory : public QObject
